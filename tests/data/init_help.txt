@@ -1,4 +1,4 @@
-Usage: landsat init [ARGS]
+Usage: lsatfetch init [ARGS]
 
 Initialize a configuration template for Landsat dataset creation.
 

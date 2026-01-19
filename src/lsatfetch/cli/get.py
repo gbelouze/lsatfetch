@@ -4,15 +4,15 @@ from typing import Annotated
 
 import cyclopts
 
-from landsat.cli.config import load
-from landsat.core import (
+from lsatfetch.cli.config import load
+from lsatfetch.core import (
     estimate_download_size,
     estimate_download_time,
     identify_tiles,
 )
 
 log = logging.getLogger(__name__)
-app = cyclopts.App(name="landsat")
+app = cyclopts.App(name="lsatfetch")
 
 
 @app.command

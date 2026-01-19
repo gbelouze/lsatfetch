@@ -1,4 +1,4 @@
-Usage: landsat COMMAND
+Usage: lsatfetch COMMAND
 
 CLI for creating Landsat image datasets
 

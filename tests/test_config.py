@@ -3,7 +3,7 @@
 from pathlib import Path
 from textwrap import dedent
 
-from landsat.cli.config import Config, load
+from lsatfetch.cli.config import Config, load
 
 
 def test_load_valid_config(sample_config_path: Path) -> None:

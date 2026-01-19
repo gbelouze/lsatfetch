@@ -8,7 +8,7 @@ from pathlib import Path
 def run_cli(args: list[str]) -> tuple[int, str, str]:
     """Run the CLI with given arguments and return exit code, stdout, stderr."""
     result = subprocess.run(
-        [sys.executable, "-m", "landsat.cli.main"] + args,
+        [sys.executable, "-m", "lsatfetch.cli.main"] + args,
         capture_output=True,
         text=True,
     )
@@ -77,7 +77,7 @@ def test_status_missing_file_error() -> None:
 
 def test_init_generated_config_is_valid(tmp_path: Path) -> None:
     """Test that init creates a valid config that load can parse."""
-    from landsat.cli.config import load
+    from lsatfetch.cli.config import load
 
     output_path = tmp_path / "config.yaml"
 

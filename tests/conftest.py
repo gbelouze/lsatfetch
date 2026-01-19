@@ -1,4 +1,4 @@
-"""Pytest configuration and fixtures for landsat tests."""
+"""Pytest configuration and fixtures for lsatfetch tests."""
 
 from pathlib import Path
 

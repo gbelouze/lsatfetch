@@ -19,4 +19,4 @@ def setup(level: int = logging.NOTSET, logfile: Path | None = None) -> None:
     logging.basicConfig(
         level=max(logging.INFO, level), format=FORMAT, datefmt="[%X]", handlers=handlers
     )
-    logging.getLogger("landsat").setLevel(level)
+    logging.getLogger("lsatfetch").setLevel(level)

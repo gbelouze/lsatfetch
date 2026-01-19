@@ -1,4 +1,4 @@
-# landsat
+# lsatfetch
 
 A CLI library for creating datasets of Landsat images from AWS S3.
 
@@ -33,7 +33,7 @@ pre-commit install
 ## Usage
 
 ```bash
-landsat --help
+lsatfetch --help
 ```
 
 ## Configuration

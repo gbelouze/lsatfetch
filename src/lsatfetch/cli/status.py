@@ -4,7 +4,7 @@ from typing import Annotated
 
 import cyclopts
 
-from landsat.cli.config import load
+from lsatfetch.cli.config import load
 
 app = cyclopts.App(name="status")
 
@@ -41,4 +41,4 @@ def status(config: Annotated[Path, cyclopts.Parameter("c")]) -> None:
             log.info(f"  Saved configuration: {config_in_output}")
     else:
         log.warning("Output directory does not exist yet")
-        log.info(f"  Run 'landsat get -c {config}' to create the dataset")
+        log.info(f"  Run 'lsatfetch get -c {config}' to create the dataset")

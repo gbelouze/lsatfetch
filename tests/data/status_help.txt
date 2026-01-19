@@ -1,4 +1,4 @@
-Usage: landsat status CONFIG
+Usage: lsatfetch status CONFIG
 
 Show the status of a Landsat dataset.
 

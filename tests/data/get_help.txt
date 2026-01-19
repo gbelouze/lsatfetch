@@ -1,4 +1,4 @@
-Usage: landsat get CONFIG
+Usage: lsatfetch get CONFIG
 
 Create a Landsat dataset based on the provided configuration.
 
