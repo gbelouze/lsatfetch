@@ -10,3 +10,7 @@ Each release can have sections: "Added", "Changed", "Deprecated", "Removed", "Fi
 
 ## pre-release
 
+### Changed
+
+- Rename project from `landsat` to `lsatfetch`. All package imports, CLI entry point, and configuration references have been updated accordingly. ([332eef1](https://github.com/gbelouze/lsatfetch/commit/332eef1))
+
