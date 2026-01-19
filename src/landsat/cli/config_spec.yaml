@@ -1,0 +1,18 @@
+# Default configuration schema for landsat CLI.
+# This file is used as a template and reference for configuration validation.
+
+aoi:
+  type: "bbox"  # "bbox" or "vector"
+  bbox: [-180, -90, 180, 90, "EPSG:4326"]  # left, bottom, right, top
+  # vector: "path/to/aoi.geojson"  # alternative to bbox
+
+time_range:
+  start: "2020-01-01"  # YYYY-MM-DD format
+  end: "2024-01-01"    # YYYY-MM-DD format
+
+output_dir: "data/landsat"  # Directory for dataset output
+
+# cloud_filter:  # Optional cloud filtering
+#   max_cloud_percent: 20  # Filter out images with >20% cloud cover
+
+parallel_jobs: 4  # Number of parallel download jobs
