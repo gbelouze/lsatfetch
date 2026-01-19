@@ -1,18 +1,20 @@
 from pathlib import Path
 from typing import Protocol
 
+from lsatfetch.tile import Tile
+
 
 class DownloadProgressCallback(Protocol):
     """Protocol for download progress callbacks."""
 
-    def __call__(self, tile_id: str, progress: float) -> None:
+    def __call__(self, tile: Tile, progress: float) -> None:
         """
         Report download progress.
 
         Parameters
         ----------
-        tile_id : str
-            Identifier of the tile being downloaded.
+        tile : Tile
+            Tile being downloaded.
         progress : float
             Progress value between 0.0 and 1.0.
         """
@@ -20,31 +22,31 @@ class DownloadProgressCallback(Protocol):
 
 
 def download_tile(
-    tile_id: str,
+    tile: Tile,
     output_dir: Path,
-    time_range: tuple[str, str] | None = None,
     progress: DownloadProgressCallback | None = None,
-) -> Path | None:
+) -> list[Path]:
     """
     Download a single Landsat tile.
 
+    If the tile has a time_index set, downloads that specific time period.
+    If time_index is None, downloads all available time periods for the tile.
+
     Parameters
     ----------
-    tile_id : str
-        Landsat tile identifier.
+    tile : Tile
+        Tile to download (may have time_index set).
     output_dir : Path
-        Directory to save the downloaded tile.
-    time_range : tuple[str, str] | None
-        Optional time range (start, end) to filter data.
+        Directory to save downloaded files.
     progress : DownloadProgressCallback | None
         Optional progress callback.
 
     Returns
     -------
-    Path | None
-        Path to the downloaded file, or None if download failed.
+    list[Path]
+        Paths to successfully downloaded files (may be empty if not found).
     """
-    return None
+    return []
 
 
 def compress_image(input_path: Path, output_path: Path) -> None:
@@ -79,14 +81,14 @@ def filter_cloudy(image_path: Path, max_cloud_percent: float) -> bool:
     return False
 
 
-def estimate_download_size(tile_ids: list[str]) -> int:
+def estimate_download_size(tiles: list[Tile]) -> int:
     """
     Estimate total download size for a list of tiles.
 
     Parameters
     ----------
-    tile_ids : list[str]
-        List of tile identifiers.
+    tiles : list[Tile]
+        List of tiles to download.
 
     Returns
     -------
@@ -96,14 +98,14 @@ def estimate_download_size(tile_ids: list[str]) -> int:
     return 0
 
 
-def estimate_download_time(tile_ids: list[str], parallel_jobs: int) -> float:
+def estimate_download_time(tiles: list[Tile], parallel_jobs: int) -> float:
     """
     Estimate download time for a list of tiles.
 
     Parameters
     ----------
-    tile_ids : list[str]
-        List of tile identifiers.
+    tiles : list[Tile]
+        List of tiles to download.
     parallel_jobs : int
         Number of parallel download jobs.
 

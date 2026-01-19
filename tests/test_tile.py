@@ -1,10 +1,14 @@
+from datetime import date
+
 import pytest
 from shapely import box
 from shapely.geometry import Polygon
 
 from lsatfetch.tile import (
+    Period,
     Tile,
     generate_all_tiles,
+    time_indices_for_range,
     tiles_intersecting,
 )
 
@@ -164,3 +168,123 @@ def test_tile_id_format_in_results() -> None:
         assert len(parts) == 2
         assert parts[0][-1] in "EW"
         assert parts[1][-1] in "NS"
+
+
+class TestPeriod:
+    """Tests for the Period class."""
+
+    def test_n_calculation(self) -> None:
+        """Test that n is calculated correctly."""
+        p = Period(year=2024, interval=1)
+        assert p.n == (2024 - 1980) * 23 + 1
+
+    def test_from_n(self) -> None:
+        """Test conversion from n to Period."""
+        p = Period.from_n(1013)
+        assert p.year == 2024
+        assert p.interval == 1
+
+    def test_from_n_boundary(self) -> None:
+        """Test conversion at year boundary."""
+        p = Period.from_n(1012)
+        assert p.year == 2023
+        assert p.interval == 23
+
+    def test_from_date(self) -> None:
+        """Test finding interval for a date."""
+        p = Period.from_date(date(2024, 3, 15))
+        assert p.year == 2024
+        # March 15 is day 75, interval = (75-1)//16 + 1 = 5
+        assert p.interval == 5
+
+    def test_start_date(self) -> None:
+        """Test start_date calculation."""
+        p = Period(year=2024, interval=1)
+        assert p.start_date() == date(2024, 1, 1)
+
+    def test_end_date(self) -> None:
+        """Test end_date calculation (16 days inclusive)."""
+        p = Period(year=2024, interval=1)
+        assert p.end_date() == date(2024, 1, 16)
+
+    def test_end_date_last_interval(self) -> None:
+        """Test end_date for last interval of year."""
+        p = Period(year=2024, interval=23)
+        # Interval 23 starts on day 352 (Dec 18 in leap year 2024)
+        # and spans 16 days, ending Jan 2, 2025
+        assert p.end_date() == date(2025, 1, 2)
+
+    def test_covers_true(self) -> None:
+        """Test date coverage check - inside interval."""
+        p = Period(year=2024, interval=1)
+        assert p.covers(date(2024, 1, 1))
+        assert p.covers(date(2024, 1, 8))
+        assert p.covers(date(2024, 1, 16))
+
+    def test_covers_false(self) -> None:
+        """Test date coverage check - outside interval."""
+        p = Period(year=2024, interval=1)
+        assert not p.covers(date(2023, 12, 31))
+        assert not p.covers(date(2024, 1, 17))
+
+
+class TestPeriodsForRange:
+    """Tests for time_indices_for_range function."""
+
+    def test_single_interval(self) -> None:
+        """Test range within single interval."""
+        periods = time_indices_for_range(date(2024, 1, 1), date(2024, 1, 15))
+        assert len(periods) == 1
+        assert periods[0] == Period(year=2024, interval=1)
+
+    def test_multiple_intervals_same_year(self) -> None:
+        """Test range spanning multiple intervals in same year."""
+        periods = time_indices_for_range(date(2024, 1, 1), date(2024, 3, 31))
+        # Jan (1-16, 17-32, 33-48), Feb (49-64, 65-80), Mar (81-96, 97-112)
+        # So intervals 1-6 (Jan 1 - Mar 15)
+        assert len(periods) == 6
+
+    def test_year_boundary(self) -> None:
+        """Test range crossing year boundary."""
+        periods = time_indices_for_range(date(2023, 12, 15), date(2024, 1, 15))
+        # Dec 15 is in interval 22, Dec 15-31 covers intervals 22 and 23
+        # Jan 1-15 is interval 1
+        assert len(periods) == 3
+        assert periods[0] == Period(year=2023, interval=22)
+        assert periods[1] == Period(year=2023, interval=23)
+        assert periods[2] == Period(year=2024, interval=1)
+
+    def test_single_day(self) -> None:
+        """Test range of single day."""
+        periods = time_indices_for_range(date(2024, 6, 15), date(2024, 6, 15))
+        # June 15 is day 167, interval = (167-1)//16 + 1 = 11
+        assert len(periods) == 1
+        assert periods[0].interval == 11
+
+    def test_invalid_range(self) -> None:
+        """Test that start > end raises ValueError."""
+        with pytest.raises(ValueError):  # noqa: PT011
+            time_indices_for_range(date(2024, 6, 15), date(2024, 1, 1))
+
+
+class TestTileWithPeriod:
+    """Tests for Tile with Period."""
+
+    def test_s3_key_with_period(self) -> None:
+        """Test s3_key generation with period."""
+        ti = Period(year=2024, interval=5)
+        tile = Tile(lat_name="12N", lon_name="075W", period=ti)
+        assert tile.s3_key == "12N/075W_12N/1017.tif"
+
+    def test_s3_key_without_period(self) -> None:
+        """Test s3_key generation without period."""
+        tile = Tile(lat_name="12N", lon_name="075W")
+        assert tile.s3_key == "12N/075W_12N/"
+
+    def test_tile_equality_with_period(self) -> None:
+        """Test equality when period differs."""
+        tile1 = Tile(lat_name="12N", lon_name="075W", period=None)
+        tile2 = Tile(lat_name="12N", lon_name="075W", period=None)
+        tile3 = Tile(lat_name="12N", lon_name="075W", period=Period(2024, 1))
+        assert tile1 == tile2
+        assert tile1 != tile3
