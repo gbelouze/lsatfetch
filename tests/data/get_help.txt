@@ -1,0 +1,7 @@
+Usage: landsat get CONFIG
+
+Create a Landsat dataset based on the provided configuration.
+
+╭─ Parameters ─────────────────────────────────────────────────────────────────╮
+│ *  CONFIG --config  [required]                                               │
+╰──────────────────────────────────────────────────────────────────────────────╯

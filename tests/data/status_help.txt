@@ -1,0 +1,7 @@
+Usage: landsat status CONFIG
+
+Show the status of a Landsat dataset.
+
+╭─ Parameters ─────────────────────────────────────────────────────────────────╮
+│ *  CONFIG --config  [required]                                               │
+╰──────────────────────────────────────────────────────────────────────────────╯

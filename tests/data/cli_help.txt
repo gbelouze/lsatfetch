@@ -1,0 +1,12 @@
+Usage: landsat COMMAND
+
+CLI for creating Landsat image datasets
+
+╭─ Commands ───────────────────────────────────────────────────────────────────╮
+│ get          Create a Landsat dataset based on the provided configuration.   │
+│ init         Initialize a configuration template for Landsat dataset         │
+│              creation.                                                       │
+│ status       Show the status of a Landsat dataset.                           │
+│ --help (-h)  Display this message and exit.                                  │
+│ --version    Display application version.                                    │
+╰──────────────────────────────────────────────────────────────────────────────╯

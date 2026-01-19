@@ -1,0 +1,8 @@
+Usage: landsat init [ARGS]
+
+Initialize a configuration template for Landsat dataset creation.
+
+╭─ Parameters ─────────────────────────────────────────────────────────────────╮
+│ OUTPUT --output                                                              │
+│ FORCE --force --no-force  [default: False]                                   │
+╰──────────────────────────────────────────────────────────────────────────────╯
