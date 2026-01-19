@@ -3,13 +3,14 @@ from pathlib import Path
 from typing import Annotated
 
 import cyclopts
+from shapely import box
 
 from lsatfetch.cli.config import load
 from lsatfetch.core import (
     estimate_download_size,
     estimate_download_time,
-    identify_tiles,
 )
+from lsatfetch.tile import tiles_intersecting
 
 log = logging.getLogger(__name__)
 app = cyclopts.App(name="lsatfetch")
@@ -33,14 +34,18 @@ def get(config: Annotated[Path, cyclopts.Parameter("c")]) -> None:
     log.info(f"  Parallel jobs: {cfg.parallel_jobs}")
 
     log.info("Identifying tiles...")
-    aoi_bbox = None
     if cfg.aoi.type == "bbox" and cfg.aoi.left is not None:
-        aoi_bbox = (cfg.aoi.left, cfg.aoi.bottom, cfg.aoi.right, cfg.aoi.top)
-    if aoi_bbox is None:
-        log.warning("No AOI bbox found. Skipping tile identification.")
+        aoi_box = box(
+            cfg.aoi.left,
+            cfg.aoi.bottom,
+            cfg.aoi.right,
+            cfg.aoi.top,
+        )
+    else:
+        log.warning("No AOI geometry found. Skipping tile identification.")
         return
 
-    tile_ids = identify_tiles(aoi_bbox)
+    tile_ids = tiles_intersecting(aoi_box)
     log.info(f"Found {len(tile_ids)} tiles")
 
     if not tile_ids:

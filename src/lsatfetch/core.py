@@ -19,23 +19,6 @@ class DownloadProgressCallback(Protocol):
         ...
 
 
-def identify_tiles(aoi_bbox: tuple[float, float, float, float, str]) -> list[str]:
-    """
-    Identify Landsat tiles that intersect with the given AOI.
-
-    Parameters
-    ----------
-    aoi_bbox : tuple[float, float, float, float, str]
-        Bounding box specification (left, bottom, right, top).
-
-    Returns
-    -------
-    list[str]
-        List of tile identifiers that intersect the AOI.
-    """
-    return []
-
-
 def download_tile(
     tile_id: str,
     output_dir: Path,
