@@ -41,7 +41,7 @@ uv run pyright                       # Run pyright (disabled by default)
 
 ```bash
 uv run ruff check src/               # Run ruff linter
-uv run ruff check --fix src/         # Run ruff with auto-fix
+uv run ruff check --fix --preview src/  # Run ruff with auto-fix (use --preview)
 uv run ruff format src/              # Format code with ruff
 uv run flake8                        # Run flake8 (pydoclint only)
 uv run pre-commit run --all-files    # Run all pre-commit hooks
