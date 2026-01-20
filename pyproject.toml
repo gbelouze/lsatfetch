@@ -119,5 +119,7 @@ pythonVersion = "3.11"
 
 [dependency-groups]
 dev = [
+    "ipdb>=0.13.13",
+    "moto>=5.1.20",
     "pre-commit>=4.5.1",
 ]

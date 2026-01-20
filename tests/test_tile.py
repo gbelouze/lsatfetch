@@ -1,4 +1,5 @@
 from datetime import date
+from pathlib import Path
 
 import pytest
 from shapely import box
@@ -8,8 +9,9 @@ from lsatfetch.tile import (
     Period,
     Tile,
     generate_all_tiles,
-    time_indices_for_range,
+    tile_s3_key,
     tiles_intersecting,
+    time_indices_for_range,
 )
 
 
@@ -139,9 +141,9 @@ def test_tiles_intersecting_polygon(geometry: Polygon) -> None:
     """Test tile identification with arbitrary polygon geometries."""
     tiles = tiles_intersecting(geometry)
     assert len(tiles) >= 1
-    for tile_id in tiles:
-        assert isinstance(tile_id, str)
-        assert "_" in tile_id
+    for tile in tiles:
+        assert isinstance(tile, Tile)
+        assert "_" in tile.tile_id
 
 
 def test_tiles_intersecting_returns_consistent_order() -> None:
@@ -157,14 +159,14 @@ def test_tiles_intersecting_returns_consistent_order() -> None:
 
 
 def test_tile_id_format_in_results() -> None:
-    """Test that returned tile IDs have correct format."""
+    """Test that returned tiles have correct format."""
     aoi = box(2, 48, 3, 49)
     tiles = tiles_intersecting(aoi)
     # This bbox spans tiles 47N-49N and 001E-003E, so 9 tiles
     assert len(tiles) == 9
-    for tile_id in tiles:
+    for tile in tiles:
         # Format: LON_NAME_LAT_NAME
-        parts = tile_id.split("_")
+        parts = tile.tile_id.split("_")
         assert len(parts) == 2
         assert parts[0][-1] in "EW"
         assert parts[1][-1] in "NS"
@@ -173,22 +175,23 @@ def test_tile_id_format_in_results() -> None:
 class TestPeriod:
     """Tests for the Period class."""
 
+    @pytest.mark.parametrize(
+        ("n", "expected_year", "expected_interval"),
+        [
+            (1013, 2024, 1),  # First interval of 2024
+            (1012, 2023, 23),  # Last interval of 2023
+        ],
+    )
+    def test_from_n(self, n: int, expected_year: int, expected_interval: int) -> None:
+        """Test conversion from n to Period."""
+        p = Period.from_n(n)
+        assert p.year == expected_year
+        assert p.interval == expected_interval
+
     def test_n_calculation(self) -> None:
         """Test that n is calculated correctly."""
         p = Period(year=2024, interval=1)
         assert p.n == (2024 - 1980) * 23 + 1
-
-    def test_from_n(self) -> None:
-        """Test conversion from n to Period."""
-        p = Period.from_n(1013)
-        assert p.year == 2024
-        assert p.interval == 1
-
-    def test_from_n_boundary(self) -> None:
-        """Test conversion at year boundary."""
-        p = Period.from_n(1012)
-        assert p.year == 2023
-        assert p.interval == 23
 
     def test_from_date(self) -> None:
         """Test finding interval for a date."""
@@ -197,35 +200,44 @@ class TestPeriod:
         # March 15 is day 75, interval = (75-1)//16 + 1 = 5
         assert p.interval == 5
 
-    def test_start_date(self) -> None:
+    @pytest.mark.parametrize(
+        ("year", "interval", "expected_start"),
+        [
+            (2024, 1, date(2024, 1, 1)),
+            (2024, 10, date(2024, 5, 24)),
+        ],
+    )
+    def test_start_date(self, year: int, interval: int, expected_start: date) -> None:
         """Test start_date calculation."""
-        p = Period(year=2024, interval=1)
-        assert p.start_date() == date(2024, 1, 1)
+        p = Period(year=year, interval=interval)
+        assert p.start_date() == expected_start
 
-    def test_end_date(self) -> None:
+    @pytest.mark.parametrize(
+        ("year", "interval", "expected_end"),
+        [
+            (2024, 1, date(2024, 1, 16)),
+            (2024, 23, date(2025, 1, 2)),
+        ],
+    )
+    def test_end_date(self, year: int, interval: int, expected_end: date) -> None:
         """Test end_date calculation (16 days inclusive)."""
-        p = Period(year=2024, interval=1)
-        assert p.end_date() == date(2024, 1, 16)
+        p = Period(year=year, interval=interval)
+        assert p.end_date() == expected_end
 
-    def test_end_date_last_interval(self) -> None:
-        """Test end_date for last interval of year."""
-        p = Period(year=2024, interval=23)
-        # Interval 23 starts on day 352 (Dec 18 in leap year 2024)
-        # and spans 16 days, ending Jan 2, 2025
-        assert p.end_date() == date(2025, 1, 2)
-
-    def test_covers_true(self) -> None:
-        """Test date coverage check - inside interval."""
+    @pytest.mark.parametrize(
+        ("d", "expected"),
+        [
+            (date(2024, 1, 1), True),
+            (date(2024, 1, 8), True),
+            (date(2024, 1, 16), True),
+            (date(2023, 12, 31), False),
+            (date(2024, 1, 17), False),
+        ],
+    )
+    def test_covers(self, d: date, expected: bool) -> None:
+        """Test date coverage check."""
         p = Period(year=2024, interval=1)
-        assert p.covers(date(2024, 1, 1))
-        assert p.covers(date(2024, 1, 8))
-        assert p.covers(date(2024, 1, 16))
-
-    def test_covers_false(self) -> None:
-        """Test date coverage check - outside interval."""
-        p = Period(year=2024, interval=1)
-        assert not p.covers(date(2023, 12, 31))
-        assert not p.covers(date(2024, 1, 17))
+        assert p.covers(d) == expected
 
 
 class TestPeriodsForRange:
@@ -267,24 +279,65 @@ class TestPeriodsForRange:
             time_indices_for_range(date(2024, 6, 15), date(2024, 1, 1))
 
 
-class TestTileWithPeriod:
-    """Tests for Tile with Period."""
+@pytest.mark.parametrize(
+    ("lat_name", "lon_name", "year", "interval", "expected_key"),
+    [
+        ("12N", "075W", 2024, 5, "12N/075W_12N/1017.tif"),
+        ("00N", "001E", 2024, 1, "00N/001E_00N/1013.tif"),
+        ("45N", "090W", 2023, 23, "45N/090W_45N/1012.tif"),
+    ],
+)
+def test_tile_s3_key(
+    lat_name: str, lon_name: str, year: int, interval: int, expected_key: str
+) -> None:
+    """Test that s3_key format is correct for various tiles and periods."""
+    tile = Tile(lat_name=lat_name, lon_name=lon_name)
+    period = Period(year=year, interval=interval)
+    assert tile_s3_key(tile, period) == expected_key
 
-    def test_s3_key_with_period(self) -> None:
-        """Test s3_key generation with period."""
-        ti = Period(year=2024, interval=5)
-        tile = Tile(lat_name="12N", lon_name="075W", period=ti)
-        assert tile.s3_key == "12N/075W_12N/1017.tif"
 
-    def test_s3_key_without_period(self) -> None:
-        """Test s3_key generation without period."""
-        tile = Tile(lat_name="12N", lon_name="075W")
-        assert tile.s3_key == "12N/075W_12N/"
+class TestDownloadTile:
+    """Tests for download_tile function."""
 
-    def test_tile_equality_with_period(self) -> None:
-        """Test equality when period differs."""
-        tile1 = Tile(lat_name="12N", lon_name="075W", period=None)
-        tile2 = Tile(lat_name="12N", lon_name="075W", period=None)
-        tile3 = Tile(lat_name="12N", lon_name="075W", period=Period(2024, 1))
-        assert tile1 == tile2
-        assert tile1 != tile3
+    @pytest.mark.parametrize(
+        ("n", "exists"),
+        [
+            (740, True),  # File exists on S3
+            (391, False),  # File does not exist
+        ],
+    )
+    def test_download_tile(self, n: int, exists: bool, tmp_path: Path, monkeypatch) -> None:
+        """Test that download_tile downloads existing files and skips missing ones."""
+        import boto3
+        from moto import mock_aws
+
+        from lsatfetch.core import download_tile
+
+        tile = Tile(lat_name="45N", lon_name="003E")
+        period = Period.from_n(n)
+        s3_key = tile_s3_key(tile, period)
+
+        with mock_aws():
+            s3_client = boto3.client("s3", region_name="us-east-1")
+            s3_client.create_bucket(Bucket="glad-landsat-ard")
+
+            def create_test_client(*args, **kwargs):
+                return boto3.client("s3", region_name="us-east-1")
+
+            monkeypatch.setattr("lsatfetch.core._get_s3_client", create_test_client)
+
+            if exists:
+                s3_client.put_object(
+                    Bucket="glad-landsat-ard",
+                    Key=s3_key,
+                    Body=b"fake tile data",
+                )
+
+            result = download_tile(tile, period, tmp_path)
+
+            if exists:
+                assert result is not None
+                assert result.exists()
+                assert result.read_bytes() == b"fake tile data"
+            else:
+                assert result is None
