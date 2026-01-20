@@ -12,6 +12,7 @@ def init(
 ) -> None:
     default_path = Path("config.yaml")
     output_path = output if output is not None else default_path
+    output_path = output_path.expanduser().resolve().absolute()
 
     if output_path.exists() and not force:
         log.error(f"{output_path} already exists. Use --force to overwrite.")
@@ -20,7 +21,6 @@ def init(
     if output_path.suffix == "":
         output_path.mkdir()
         output_path = output_path / "config.yaml"
-    output_path = output_path.expanduser().resolve().absolute()
 
     config_dict = {
         "aoi": {

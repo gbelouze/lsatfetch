@@ -47,7 +47,11 @@ def test_init_force_overwrites(tmp_path: Path) -> None:
 
 def test_get_with_config(sample_config_path: Path) -> None:
     """Test that get command runs without error with valid config."""
-    exit_code, stdout, _stderr = run_cli(["get", "--config", str(sample_config_path)])
+    from unittest.mock import patch
+
+    with patch("lsatfetch.cli.get.download_landsat") as mock_download:
+        mock_download.return_value = (0, 0)
+        exit_code, stdout, _stderr = run_cli(["get", "--config", str(sample_config_path)])
 
     assert exit_code == 0
     assert "Configuration loaded" in stdout
@@ -94,5 +98,5 @@ def test_init_generated_config_is_valid(tmp_path: Path) -> None:
     assert cfg.aoi.crs == "EPSG:4326"
     assert cfg.time_range.start == "2020-01-01"
     assert cfg.time_range.end == "2024-01-01"
-    assert cfg.output_dir.name == "landsat"
+    assert cfg.output_dir.name == output_path.name
     assert cfg.parallel_jobs == 4

@@ -6,9 +6,9 @@ from textwrap import dedent
 from lsatfetch.cli.config import Config, load
 
 
-def test_load_valid_config(sample_config_path: Path) -> None:
+def test_load_valid_config(original_config_path: Path) -> None:
     """Test loading a valid configuration file."""
-    cfg = load(sample_config_path)
+    cfg = load(original_config_path)
 
     assert isinstance(cfg, Config)
     assert cfg.aoi.type == "bbox"
