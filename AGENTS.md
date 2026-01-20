@@ -34,6 +34,7 @@ uv run pytest -m slow                # Run tests marked as slow
 
 ```bash
 uv run mypy src/                     # Run mypy on src directory
+uv run mypy tests/                   # Run mypy on tests directory
 uv run pyright                       # Run pyright (disabled by default)
 ```
 
