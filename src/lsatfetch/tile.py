@@ -158,9 +158,9 @@ def time_indices_for_range(start: date, end: date) -> list[Period]:
         msg = "start date must be <= end date"
         raise ValueError(msg)
 
-    start = Period.from_date(start)
-    end = Period.from_date(end)
-    return [Period.from_n(n) for n in range(start.n, end.n + 1)]
+    start_period = Period.from_date(start)
+    end_period = Period.from_date(end)
+    return [Period.from_n(n) for n in range(start_period.n, end_period.n + 1)]
 
 
 @dataclass(frozen=True)
@@ -242,7 +242,7 @@ def tile_s3_key(tile: Tile, period: Period) -> str:
         S3 key (e.g., "12N/075W_12N/1017.tif").
     """
     tile_dir = f"{tile.lon_name}_{tile.lat_name}"
-    return f"{tile.lat_name}/{tile_dir}/{period.n}.tif"
+    return f"data/tiles/{tile.lat_name}/{tile_dir}/{period.n}.tif"
 
 
 def _lat_names() -> list[str]:

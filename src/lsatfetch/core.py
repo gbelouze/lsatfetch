@@ -20,7 +20,7 @@ from lsatfetch.utils.progress import default_bar
 
 log = logging.getLogger(__name__)
 
-GLAD_LANDSAT_BUCKET = "glad-landsat-ard"
+GLAD_LANDSAT_BUCKET = "glad.landsat.ard"
 
 
 def _get_s3_client():

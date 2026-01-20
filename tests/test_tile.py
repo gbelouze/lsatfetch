@@ -282,9 +282,9 @@ class TestPeriodsForRange:
 @pytest.mark.parametrize(
     ("lat_name", "lon_name", "year", "interval", "expected_key"),
     [
-        ("12N", "075W", 2024, 5, "12N/075W_12N/1017.tif"),
-        ("00N", "001E", 2024, 1, "00N/001E_00N/1013.tif"),
-        ("45N", "090W", 2023, 23, "45N/090W_45N/1012.tif"),
+        ("12N", "075W", 2024, 5, "data/tiles/12N/075W_12N/1017.tif"),
+        ("00N", "001E", 2024, 1, "data/tiles/00N/001E_00N/1013.tif"),
+        ("45N", "090W", 2023, 23, "data/tiles/45N/090W_45N/1012.tif"),
     ],
 )
 def test_tile_s3_key(
@@ -306,7 +306,9 @@ class TestDownloadTile:
             (391, False),  # File does not exist
         ],
     )
-    def test_download_tile(self, n: int, exists: bool, tmp_path: Path, monkeypatch) -> None:
+    def test_download_tile(
+        self, n: int, exists: bool, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """Test that download_tile downloads existing files and skips missing ones."""
         import boto3
         from moto import mock_aws
@@ -319,7 +321,7 @@ class TestDownloadTile:
 
         with mock_aws():
             s3_client = boto3.client("s3", region_name="us-east-1")
-            s3_client.create_bucket(Bucket="glad-landsat-ard")
+            s3_client.create_bucket(Bucket="glad.landsat.ard")
 
             def create_test_client(*args, **kwargs):
                 return boto3.client("s3", region_name="us-east-1")
@@ -328,7 +330,7 @@ class TestDownloadTile:
 
             if exists:
                 s3_client.put_object(
-                    Bucket="glad-landsat-ard",
+                    Bucket="glad.landsat.ard",
                     Key=s3_key,
                     Body=b"fake tile data",
                 )
