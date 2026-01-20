@@ -3,6 +3,9 @@ Usage: lsatfetch init [ARGS]
 Initialize a configuration template for Landsat dataset creation.
 
 ╭─ Parameters ─────────────────────────────────────────────────────────────────╮
-│ OUTPUT --output                                                              │
-│ FORCE --force --no-force  [default: False]                                   │
+│ OUTPUT --output           Path to save the configuration template. If not    │
+│                           provided, saves to current directory or output_dir │
+│                           if specified.                                      │
+│ FORCE --force --no-force  Overwrite existing configuration file. Defaults to │
+│                           False. [default: False]                            │
 ╰──────────────────────────────────────────────────────────────────────────────╯

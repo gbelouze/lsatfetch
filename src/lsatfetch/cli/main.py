@@ -1,5 +1,6 @@
 """Main entry point for lsatfetch CLI."""
 
+import logging
 from pathlib import Path
 
 import cyclopts
@@ -8,6 +9,12 @@ app = cyclopts.App(
     name="lsatfetch",
     help="CLI for creating Landsat image datasets",
 )
+
+
+def _setup_logging(level: int = logging.INFO) -> None:
+    from lsatfetch.utils.log import setup
+
+    setup(level=level)
 
 
 @app.command
@@ -26,6 +33,7 @@ def init(
     force : bool
         Overwrite existing configuration file. Defaults to False.
     """
+    _setup_logging()
     from lsatfetch.cli.init import init as init_cmd
 
     init_cmd(output, force)
@@ -34,6 +42,7 @@ def init(
 @app.command
 def get(
     config: Path,
+    verbose: bool = False,
 ) -> None:
     """
     Create a Landsat dataset based on the provided configuration.
@@ -42,7 +51,10 @@ def get(
     ----------
     config : Path
         Path to the configuration YAML file.
+    verbose : bool
+        Enable verbose (DEBUG) logging. Defaults to False.
     """
+    _setup_logging(level=logging.DEBUG if verbose else logging.INFO)
     from lsatfetch.cli.get import get as get_cmd
 
     get_cmd(config)
@@ -60,33 +72,11 @@ def status(
     config : Path
         Path to the configuration YAML file.
     """
+    _setup_logging()
     from lsatfetch.cli.status import status as status_cmd
 
     status_cmd(config)
 
 
-def main(
-    verbose: bool = False,
-    quiet: bool = False,
-    logfile: Path | None = None,
-    debug: bool = False,
-) -> None:
-    """Main entry point for the lsatfetch CLI."""
-    from lsatfetch.utils.log import setup
-
-    level = 0
-    if verbose:
-        level = logging.DEBUG
-    if quiet:
-        level = logging.ERROR
-    if debug:
-        level = logging.DEBUG
-    setup(level=level, logfile=logfile)
-
-    app()
-
-
 if __name__ == "__main__":
-    import logging
-
-    main()
+    app()

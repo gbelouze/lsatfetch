@@ -18,7 +18,7 @@ dependencies = [
 ]
 
 [project.scripts]
-lsatfetch = "lsatfetch.cli.main:main"
+lsatfetch = "lsatfetch.cli.main:app"
 
 [build-system]
 requires = ["uv_build>=0.8.13,<0.9.0"]
