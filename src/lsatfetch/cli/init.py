@@ -1,37 +1,26 @@
 import logging
 from pathlib import Path
-from typing import Annotated
 
-import cyclopts
 import yaml
-
-app = cyclopts.App(name="init")
 
 log = logging.getLogger(__name__)
 
 
-@app.command
 def init(
-    output: Annotated[Path, cyclopts.Parameter("o")] | None = None,
+    output: Path | None = None,
     force: bool = False,
 ) -> None:
-    """
-    Initialize a configuration template for Landsat dataset creation.
-
-    Parameters
-    ----------
-    output : Path | None
-        Path to save the configuration template.
-        If not provided, saves to current directory or output_dir if specified.
-    force : bool
-        Overwrite existing configuration file. Defaults to False.
-    """
     default_path = Path("config.yaml")
-    output_path = output or default_path
+    output_path = output if output is not None else default_path
 
     if output_path.exists() and not force:
         log.error(f"{output_path} already exists. Use --force to overwrite.")
         return
+
+    if output_path.suffix == "":
+        output_path.mkdir()
+        output_path = output_path / "config.yaml"
+    output_path = output_path.expanduser().resolve().absolute()
 
     config_dict = {
         "aoi": {
@@ -46,7 +35,7 @@ def init(
             "start": "2020-01-01",
             "end": "2024-01-01",
         },
-        "output_dir": "data/landsat",
+        "output_dir": str(output_path),
         # "cloud_filter": {
         #     "max_cloud_percent": 20,
         # },

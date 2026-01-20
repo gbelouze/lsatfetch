@@ -1,26 +1,12 @@
 import logging
 from pathlib import Path
-from typing import Annotated
-
-import cyclopts
 
 from lsatfetch.cli.config import load
-
-app = cyclopts.App(name="status")
 
 log = logging.getLogger(__name__)
 
 
-@app.command
-def status(config: Annotated[Path, cyclopts.Parameter("c")]) -> None:
-    """
-    Show the status of a Landsat dataset.
-
-    Parameters
-    ----------
-    config : Path
-        Path to the configuration YAML file.
-    """
+def status(config: Path) -> None:
     log.info("Dataset Status")
 
     if not config.exists():

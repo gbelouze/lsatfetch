@@ -15,7 +15,17 @@ def init(
     output: Path | None = None,
     force: bool = False,
 ) -> None:
-    """Initialize a configuration template for Landsat dataset creation."""
+    """
+    Initialize a configuration template for Landsat dataset creation.
+
+    Parameters
+    ----------
+    output : Path | None
+        Path to save the configuration template.
+        If not provided, saves to current directory or output_dir if specified.
+    force : bool
+        Overwrite existing configuration file. Defaults to False.
+    """
     from lsatfetch.cli.init import init as init_cmd
 
     init_cmd(output, force)
@@ -25,7 +35,14 @@ def init(
 def get(
     config: Path,
 ) -> None:
-    """Create a Landsat dataset based on the provided configuration."""
+    """
+    Create a Landsat dataset based on the provided configuration.
+
+    Parameters
+    ----------
+    config : Path
+        Path to the configuration YAML file.
+    """
     from lsatfetch.cli.get import get as get_cmd
 
     get_cmd(config)
@@ -35,7 +52,14 @@ def get(
 def status(
     config: Path,
 ) -> None:
-    """Show the status of a Landsat dataset."""
+    """
+    Show the status of a Landsat dataset.
+
+    Parameters
+    ----------
+    config : Path
+        Path to the configuration YAML file.
+    """
     from lsatfetch.cli.status import status as status_cmd
 
     status_cmd(config)

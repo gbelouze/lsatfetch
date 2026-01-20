@@ -1,8 +1,6 @@
 import logging
 from pathlib import Path
-from typing import Annotated
 
-import cyclopts
 from shapely import box
 
 from lsatfetch.cli.config import load
@@ -13,19 +11,9 @@ from lsatfetch.core import (
 from lsatfetch.tile import tiles_intersecting
 
 log = logging.getLogger(__name__)
-app = cyclopts.App(name="lsatfetch")
 
 
-@app.command
-def get(config: Annotated[Path, cyclopts.Parameter("c")]) -> None:
-    """
-    Create a Landsat dataset based on the provided configuration.
-
-    Parameters
-    ----------
-    config : Path
-        Path to the configuration YAML file.
-    """
+def get(config: Path) -> None:
     log.info("Loading configuration...")
     cfg = load(config)
     log.info(f"Configuration loaded from {config}")
