@@ -10,6 +10,7 @@ __all__ = [
     "generate_all_tiles",
     "tiles_intersecting",
     "time_indices_for_range",
+    "tile_s3_key",
 ]
 
 
@@ -173,13 +174,10 @@ class Tile:
         Latitude band name (e.g., "00N", "45S").
     lon_name : str
         Longitude band name (e.g., "001E", "120W").
-    period : Period | None
-        Optional time index for time-specific tiles.
     """
 
     lat_name: str
     lon_name: str
-    period: Period | None = None
 
     @property
     def tile_id(self) -> str:
@@ -226,20 +224,25 @@ class Tile:
         """
         return box(self.lon, self.lat, self.lon + 1, self.lat + 1)
 
-    @property
-    def s3_key(self) -> str:
-        """
-        S3 key for this tile (relative to bucket root).
 
-        Returns
-        -------
-        str
-            S3 key (e.g., "12N/075W_12N/123.tif").
-        """
-        tile_dir = f"{self.lon_name}_{self.lat_name}"
-        if self.period is not None:
-            return f"{self.lat_name}/{tile_dir}/{self.period.n}.tif"
-        return f"{self.lat_name}/{tile_dir}/"
+def tile_s3_key(tile: Tile, period: Period) -> str:
+    """
+    Generate S3 key for a tile at a specific period.
+
+    Parameters
+    ----------
+    tile : Tile
+        Spatial tile.
+    period : Period
+        Time period.
+
+    Returns
+    -------
+    str
+        S3 key (e.g., "12N/075W_12N/1017.tif").
+    """
+    tile_dir = f"{tile.lon_name}_{tile.lat_name}"
+    return f"{tile.lat_name}/{tile_dir}/{period.n}.tif"
 
 
 def _lat_names() -> list[str]:
@@ -272,7 +275,7 @@ def generate_all_tiles() -> list[Tile]:
     return tiles
 
 
-def tiles_intersecting(aoi: Polygon) -> list[str]:
+def tiles_intersecting(aoi: Polygon) -> list[Tile]:
     """
     Identify tiles that intersect with a given geometry.
 
@@ -283,7 +286,7 @@ def tiles_intersecting(aoi: Polygon) -> list[str]:
 
     Returns
     -------
-    list[str]
-        List of tile IDs that intersect the geometry.
+    list[Tile]
+        List of tiles that intersect the geometry.
     """
-    return [t.tile_id for t in generate_all_tiles() if t.box.intersects(aoi)]
+    return [t for t in generate_all_tiles() if t.box.intersects(aoi)]

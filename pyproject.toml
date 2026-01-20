@@ -6,6 +6,7 @@ readme = "README.md"
 authors = [{ name = "Gabriel Belouze", email = "gabriel@belouze.com" }]
 requires-python = ">=3.12"
 dependencies = [
+    "boto3>=1.42.30",
     "cyclopts>=4.5.0",
     "geopandas>=1.1.2",
     "numpy>=2.4.1",

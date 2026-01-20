@@ -9,14 +9,14 @@ from rich.progress import (
     TimeElapsedColumn,
 )
 
-__all__ = ["default_bar", "landsat_debug"]
+__all__ = ["default_bar", "lsat_debug"]
 
 
 log = logging.getLogger(__name__)
 
 
-def landsat_debug() -> bool:
-    match os.getenv("LANDSAT_DEBUG"):
+def lsat_debug() -> bool:
+    match os.getenv("LSATFETCH_DEBUG"):
         case "true":
             return True
         case "1":
@@ -26,7 +26,7 @@ def landsat_debug() -> bool:
 
 
 def default_bar() -> Progress:
-    disabled = landsat_debug()
+    disabled = lsat_debug()
     if disabled:
         log.warning("progress bar is disabled.")
     return Progress(
@@ -40,4 +40,4 @@ def default_bar() -> Progress:
 
 
 if __name__ == "__main__":
-    log.info(f"{landsat_debug()=}")
+    log.info(f"{lsat_debug()=}")
