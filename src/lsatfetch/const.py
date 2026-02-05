@@ -1,0 +1,4 @@
+GLAD_LANDSAT_BUCKET = "glad.landsat.ard"
+KEEP_VALUES = {1, 11, 14, 15, 16, 17}
+NODATA_THRESHOLD = 0.80
+

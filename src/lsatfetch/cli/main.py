@@ -60,22 +60,35 @@ def get(
     get_cmd(config)
 
 
-@app.command
-def status(
-    config: Path,
+@app.command  # type: ignore[misc]
+def compress(
+    input_dir: Path,
+    quality: int = 50,
+    watch: bool = False,
+    report: bool = False,
+    verbose: bool = False,
 ) -> None:
     """
-    Show the status of a Landsat dataset.
+    Compress Landsat TIFF images to JPEG2000 format with cloud filtering.
 
     Parameters
     ----------
-    config : Path
-        Path to the configuration YAML file.
+    input_dir : Path
+        Directory containing .tif files to process.
+    quality : int
+        JPEG2000 compression quality (1-100). Defaults to 50.
+    watch : bool
+        Watch for new .tif files and process them automatically.
+        Stops after 15 minutes of inactivity. Defaults to False.
+    report : bool
+        Print a statistics report after processing. Defaults to False.
+    verbose : bool
+        Enable verbose (DEBUG) logging. Defaults to False.
     """
-    _setup_logging()
-    from lsatfetch.cli.status import status as status_cmd
+    _setup_logging(level=logging.DEBUG if verbose else logging.INFO)
+    from lsatfetch.cli.compress import compress as compress_cmd
 
-    status_cmd(config)
+    compress_cmd(input_dir, quality, watch, report, verbose)
 
 
 if __name__ == "__main__":

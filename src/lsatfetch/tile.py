@@ -4,6 +4,8 @@ from datetime import date, timedelta
 from shapely import box
 from shapely.geometry import Polygon
 
+from lsatfetch.const import GLAD_LANDSAT_BUCKET
+
 __all__ = [
     "Tile",
     "Period",
@@ -245,6 +247,50 @@ def tile_s3_key(tile: Tile, period: Period) -> str:
     return f"data/tiles/{tile.lat_name}/{tile_dir}/{period.n}.tif"
 
 
+def parse_tile_s3_key(key: str) -> tuple[Tile, Period] | None:
+    """
+    Parse an S3 key to extract Tile and Period.
+
+    Parameters
+    ----------
+    key : str
+        S3 key like "data/tiles/10N/075W_10N/1017.tif" or
+        "glad.landsat.ard/data/tiles/10N/075W_10N/1017.tif"
+
+    Returns
+    -------
+    tuple[Tile, Period] | None
+        Tile and Period objects, or None if parsing fails.
+    """
+    try:
+        if key.startswith(f"{GLAD_LANDSAT_BUCKET}/"):
+            key = key.removeprefix(f"{GLAD_LANDSAT_BUCKET}/")
+
+        if key.startswith("data/tiles/"):
+            key = key.removeprefix("data/tiles/")
+
+        parts = key.split("/")
+        if len(parts) != 3:
+            return None
+
+        lat_name = parts[0]
+        lon_lat = parts[1]
+        filename = parts[2]
+
+        if not filename.endswith(".tif"):
+            return None
+
+        period_n = int(filename[:-4])
+        period = Period.from_n(period_n)
+
+        lon_name = "_".join(lon_lat.split("_")[:-1])
+        tile = Tile(lat_name=lat_name, lon_name=lon_name)
+
+        return tile, period
+    except (ValueError, IndexError):
+        return None
+
+
 def _lat_names() -> list[str]:
     """Generate all valid latitude band names."""
     north = [f"{i:02d}N" for i in range(84)]
@@ -281,7 +327,7 @@ def tiles_intersecting(aoi: Polygon) -> list[Tile]:
 
     Parameters
     ----------
-    aoi : shapely.geometry.Polygon
+    aoi : Polygon
         Area of interest geometry.
 
     Returns
