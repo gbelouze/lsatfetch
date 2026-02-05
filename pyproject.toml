@@ -8,13 +8,18 @@ requires-python = ">=3.12"
 dependencies = [
     "boto3>=1.42.30",
     "cyclopts>=4.5.0",
+    "duckdb>=1.1.0",
     "geopandas>=1.1.2",
     "numpy>=2.4.1",
     "omegaconf>=2.3.0",
     "pooch>=1.8.2",
+    "pyarrow>=18.0.0",
+    "pystac>=1.14.3",
     "pytest>=9.0.2",
     "rasterio>=1.5.0",
     "rich>=14.2.0",
+    "s3fs>=2026.1.0",
+    "watchdog>=6.0.0",
 ]
 
 [project.scripts]
@@ -25,7 +30,7 @@ requires = ["uv_build>=0.8.13,<0.9.0"]
 build-backend = "uv_build"
 
 [tool.ruff]
-target-version = "py310"
+target-version = "py312"
 line-length = 100
 [tool.ruff.lint]
 select = [
@@ -93,7 +98,7 @@ log_cli_level = "DEBUG"
 log_level = "DEBUG"
 
 [tool.mypy]
-python_version = "3.11"
+python_version = "3.12"
 warn_redundant_casts = true
 warn_unused_configs = true
 pretty = true
@@ -115,7 +120,7 @@ exclude = ['tests/test_download.py', 'tests/conftest.py']
 
 [tool.pyright]
 typeCheckingMode = "off"
-pythonVersion = "3.11"
+pythonVersion = "3.12"
 
 [dependency-groups]
 dev = [

@@ -41,7 +41,7 @@ uv run pyright                       # Run pyright (disabled by default)
 ### Linting and Formatting
 
 ```bash
-uv run ruff check src/               # Run ruff linter
+uv run ruff check --preview src/     # Run ruff linter
 uv run ruff check --fix --preview src/  # Run ruff with auto-fix (use --preview)
 uv run ruff format src/              # Format code with ruff
 uv run flake8                        # Run flake8 (pydoclint only)
