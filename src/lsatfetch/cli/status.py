@@ -7,6 +7,10 @@ log = logging.getLogger(__name__)
 
 
 def status(config: Path) -> None:
+    from lsatfetch.utils.log import setup
+
+    setup(level=logging.INFO)
+
     log.info("Dataset Status")
 
     if not config.exists():

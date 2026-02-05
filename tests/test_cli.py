@@ -19,7 +19,7 @@ def run_cli(args: list[str]) -> tuple[int, str, str]:
 
 def test_help_consistency() -> None:
     """Test that main --help output matches expected."""
-    exit_code, stdout, stderr = run_cli(["--help"])
+    exit_code, stdout, _ = run_cli(["--help"])
 
     assert exit_code == 0
     expected = (TESTS_DIR / "data" / "cli_help.txt").read_text()
@@ -28,7 +28,7 @@ def test_help_consistency() -> None:
 
 def test_init_help_consistency() -> None:
     """Test that init --help output matches expected."""
-    exit_code, stdout, stderr = run_cli(["init", "--help"])
+    exit_code, stdout, _ = run_cli(["init", "--help"])
 
     assert exit_code == 0
     expected = (TESTS_DIR / "data" / "init_help.txt").read_text()
@@ -37,7 +37,7 @@ def test_init_help_consistency() -> None:
 
 def test_get_help_consistency() -> None:
     """Test that get --help output matches expected."""
-    exit_code, stdout, stderr = run_cli(["get", "--help"])
+    exit_code, stdout, _ = run_cli(["get", "--help"])
 
     assert exit_code == 0
     expected = (TESTS_DIR / "data" / "get_help.txt").read_text()
@@ -46,7 +46,7 @@ def test_get_help_consistency() -> None:
 
 def test_status_help_consistency() -> None:
     """Test that status --help output matches expected."""
-    exit_code, stdout, stderr = run_cli(["status", "--help"])
+    exit_code, stdout, _ = run_cli(["status", "--help"])
 
     assert exit_code == 0
     expected = (TESTS_DIR / "data" / "status_help.txt").read_text()

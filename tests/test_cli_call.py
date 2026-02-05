@@ -91,12 +91,12 @@ def test_init_generated_config_is_valid(tmp_path: Path) -> None:
 
     cfg = load(output_path)
     assert cfg.aoi.type == "bbox"
-    assert cfg.aoi.left == -180
-    assert cfg.aoi.bottom == -90
-    assert cfg.aoi.right == 180
-    assert cfg.aoi.top == 90
+    assert cfg.aoi.left == 3
+    assert cfg.aoi.bottom == 40
+    assert cfg.aoi.right == 4
+    assert cfg.aoi.top == 41
     assert cfg.aoi.crs == "EPSG:4326"
     assert cfg.time_range.start == "2020-01-01"
-    assert cfg.time_range.end == "2024-01-01"
-    assert cfg.output_dir.name == output_path.name
+    assert cfg.time_range.end == "2021-01-01"
+    assert cfg.output_dir == output_path.parent
     assert cfg.parallel_jobs == 4

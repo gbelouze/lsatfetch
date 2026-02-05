@@ -43,6 +43,8 @@ def init(
 def get(
     config: Path,
     verbose: bool = False,
+    postprocess: bool = False,
+    quality: int = 50,
 ) -> None:
     """
     Create a Landsat dataset based on the provided configuration.
@@ -53,42 +55,32 @@ def get(
         Path to the configuration YAML file.
     verbose : bool
         Enable verbose (DEBUG) logging. Defaults to False.
+    postprocess : bool
+        Enable post-processing (compression to JP2). Defaults to False.
+    quality : int
+        JPEG2000 compression quality (1-100). Defaults to 50.
     """
     _setup_logging(level=logging.DEBUG if verbose else logging.INFO)
     from lsatfetch.cli.get import get as get_cmd
 
-    get_cmd(config)
+    get_cmd(config, postprocess, quality)
 
 
 @app.command  # type: ignore[misc]
-def compress(
-    input_dir: Path,
-    quality: int = 50,
-    watch: bool = False,
-    report: bool = False,
-    verbose: bool = False,
+def status(
+    config: Path,
 ) -> None:
     """
-    Compress Landsat TIFF images to JPEG2000 format with cloud filtering.
+    Show the status of a Landsat dataset.
 
     Parameters
     ----------
-    input_dir : Path
-        Directory containing .tif files to process.
-    quality : int
-        JPEG2000 compression quality (1-100). Defaults to 50.
-    watch : bool
-        Watch for new .tif files and process them automatically.
-        Stops after 15 minutes of inactivity. Defaults to False.
-    report : bool
-        Print a statistics report after processing. Defaults to False.
-    verbose : bool
-        Enable verbose (DEBUG) logging. Defaults to False.
+    config : Path
+        Path to the configuration YAML file.
     """
-    _setup_logging(level=logging.DEBUG if verbose else logging.INFO)
-    from lsatfetch.cli.compress import compress as compress_cmd
+    from lsatfetch.cli.status import status as status_cmd
 
-    compress_cmd(input_dir, quality, watch, report, verbose)
+    status_cmd(config)
 
 
 if __name__ == "__main__":

@@ -11,7 +11,7 @@ from lsatfetch.tile import tiles_intersecting
 log = logging.getLogger(__name__)
 
 
-def get(config_path: Path) -> None:
+def get(config_path: Path, postprocess: bool = False, quality: int = 50) -> None:
     log.debug("Loading configuration")
     cfg = load(config_path)
     log.info(f"Configuration loaded from {config_path}")
@@ -51,4 +51,6 @@ def get(config_path: Path) -> None:
         end_date=end_date,
         output_dir=cfg.output_dir,
         parallel_jobs=cfg.parallel_jobs,
+        postprocess=postprocess,
+        quality=quality,
     )

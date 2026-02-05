@@ -33,7 +33,7 @@ class Statistics(MutableMapping[str, ImageStatistics]):
         self.table = table_name
 
         # Initialize the table once at startup
-        with self._connection() as con:
+        with self._connection(read_only=False) as con:
             con.execute(f"""
                 CREATE TABLE IF NOT EXISTS {self.table} (
                     file_id TEXT PRIMARY KEY,
@@ -49,7 +49,7 @@ class Statistics(MutableMapping[str, ImageStatistics]):
     @contextmanager
     def _connection(self, read_only: bool = True):
         """Helper to open and automatically close the connection.
-        
+
         Yields
         ------
         con: DuckDBPyConnection
