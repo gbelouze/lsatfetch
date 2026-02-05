@@ -5,7 +5,6 @@ import tempfile
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
 from contextlib import ExitStack
 from datetime import date, datetime
-from multiprocessing.queues import Queue
 from pathlib import Path
 from typing import Any, cast
 
@@ -58,7 +57,6 @@ def download_tile(
     period: Period,
     output_dir: Path,
     progress: Progress | None = None,
-    publish_queue: Queue[Path] | None = None,
 ) -> Path | None:
     """
     Download a single Landsat tile for a specific period.
@@ -131,8 +129,6 @@ def download_tile(
             tmp_path.rename(output_path)
 
         log.debug(f"Downloaded tile to {output_path}")
-        if publish_queue is not None:
-            publish_queue.put(output_path)
     return output_path
 
 
@@ -167,7 +163,7 @@ def compress_landsat_image(input_path: Path, output_path: Path, quality: int = 5
 
     with rio.open(input_path) as src:
         log.debug(f"Reading {input_path}")
-        bands_data = src.read(bands=[1, 2, 3, 4, 5, 6, 7], out_dtype="float32")
+        bands_data = src.read(indexes=[1, 2, 3, 4, 5, 6, 7], out_dtype="float32")
         band8 = src.read(8)
         profile = src.profile
 
@@ -238,7 +234,10 @@ def process_file(
         return None
 
     output_path = base_dir / "landsat" / input_path.with_suffix(".jp2").name
+    size_bytes = input_path.stat().st_size
     compress_landsat_image(input_path, output_path, quality)
+    if input_path.exists():  # compression was skipped
+        return None
 
     stat = ImageStatistics(
         file_id=file_id,
@@ -246,7 +245,7 @@ def process_file(
         n_valid_final=pixel_stat["n_valid_final"],
         discarded=pixel_stat["discarded"],
         processed_at=stat["processed_at"] if stat is not None else datetime.now(),
-        size_bytes=input_path.stat().st_size,
+        size_bytes=size_bytes,
         compressed_size_bytes=output_path.stat().st_size,
     )
     statistics[file_id] = stat
@@ -321,6 +320,7 @@ def get(
             with (
                 ThreadPoolExecutor(max_workers=parallel_jobs) as download_executor,
                 temporary_task(
+                    progress,
                     "[cyan]Downloading Landsat ARD tiles...[/]",
                     total=len(tasks),
                 ) as download_task,
