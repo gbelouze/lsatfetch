@@ -1,7 +1,7 @@
 import logging
 from pathlib import Path
 
-import yaml
+import yaml  # type: ignore[import-untyped]
 
 log = logging.getLogger(__name__)
 
@@ -25,17 +25,17 @@ def init(
     config_dict = {
         "aoi": {
             "type": "bbox",
-            "left": -180,
-            "bottom": -90,
-            "right": 180,
-            "top": 90,
+            "left": 3,
+            "bottom": 40,
+            "right": 4,
+            "top": 41,
             # "vector": "path/to/aoi.geojson",
         },
         "time_range": {
             "start": "2020-01-01",
-            "end": "2024-01-01",
+            "end": "2021-01-01",
         },
-        "output_dir": str(output_path),
+        "output_dir": str(output_path.parent),
         # "cloud_filter": {
         #     "max_cloud_percent": 20,
         # },

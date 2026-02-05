@@ -138,4 +138,4 @@ def load(path: Path) -> Config:
     structured = OmegaConf.structured(Config)
     merged = OmegaConf.merge(structured, from_yaml)
     OmegaConf.resolve(merged)
-    return OmegaConf.to_object(merged)  # type: ignore[return-value]
+    return OmegaConf.to_object(merged)  # type: ignore[no-any-return]

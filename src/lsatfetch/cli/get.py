@@ -11,10 +11,10 @@ from lsatfetch.tile import tiles_intersecting
 log = logging.getLogger(__name__)
 
 
-def get(config: Path) -> None:
+def get(config_path: Path) -> None:
     log.debug("Loading configuration")
-    cfg = load(config)
-    log.info(f"Configuration loaded from {config}")
+    cfg = load(config_path)
+    log.info(f"Configuration loaded from {config_path}")
     log.info(f"Output directory: {cfg.output_dir}")
     log.debug(f"AOI type: {cfg.aoi.type}")
     log.debug(f"Parallel jobs: {cfg.parallel_jobs}")
