@@ -375,7 +375,7 @@ async def _get_async(
                     log.debug(f"Skipping {tile_id}: established as missing on S3.")
                     skip_dl = True
                 elif tile_id in meta.pp and meta.pp[tile_id]["discarded"]:
-                    log.debug(f"Skipping {tile_id}: established as discarded.")
+                    log.debug(f"Skipping {tile_id}: established as filtered out.")
                     skip_dl = True
                 elif jp2_path.exists():
                     log.debug(f"Skipping {tile_id}: JP2 already exists.")
@@ -390,7 +390,8 @@ async def _get_async(
                     # If TIFF exists but not processed, we might still want to process it
                     if postprocess and tif_path.exists() and not jp2_path.exists():
                         if tile_id in meta.pp and meta.pp[tile_id]["discarded"]:
-                            pass  # already discarded
+                            log.debug(f"{tif_path} exists but is marked as filtered out. Removing.")
+                            tif_path.unlink()
                         else:
                             pp_future = loop.run_in_executor(
                                 pp_pool,
@@ -462,7 +463,7 @@ async def _get_async(
                                 n_failures += 1
                                 first_failure = first_failure if first_failure is not None else e
                             finally:
-                                if pp_bar:
+                                if pp_bar is not None:
                                     progress.advance(pp_bar)
             except (KeyboardInterrupt, asyncio.CancelledError):
                 log.warning("[yellow]Interrupt received. Please wait for cleanup...[/]")
