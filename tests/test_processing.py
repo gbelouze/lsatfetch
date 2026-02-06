@@ -225,4 +225,5 @@ class TestProcessFile:
         result = process_file(input_path, tile_id, quality=50)
 
         assert result is not None
+        assert result["compressed_size_bytes"] is not None
         assert result["compressed_size_bytes"] > 0

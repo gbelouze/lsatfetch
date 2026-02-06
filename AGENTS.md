@@ -33,9 +33,8 @@ uv run pytest -m slow                # Run tests marked as slow
 ### Type Checking
 
 ```bash
-uv run mypy src/                     # Run mypy on src directory
-uv run mypy tests/                   # Run mypy on tests directory
-uv run pyright                       # Run pyright (disabled by default)
+uvx ty check src/                     # Run ty on src directory
+uvx ty check tests/                   # Run ty on tests directory
 ```
 
 ### Linting and Formatting
@@ -188,7 +187,7 @@ The repository uses pre-commit hooks that run:
 - `trailing-whitespace`
 - `check-merge-conflict`
 - `ruff` (lint + format)
-- `mypy` on `src/`
+- `ty` on `src/`
 - `pydoclint-flake8`
 
 Run `pre-commit run --all-files` to verify code quality before committing.
@@ -198,6 +197,6 @@ Run `pre-commit run --all-files` to verify code quality before committing.
 - Python: >=3.12
 - Linter: ruff
 - Formatter: ruff-format
-- Type checker: mypy (pyright disabled)
+- Type checker: ty (pyright disabled)
 - Docstring style: numpy (pydoclint)
 - Test runner: pytest

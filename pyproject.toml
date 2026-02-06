@@ -96,8 +96,11 @@ log_cli = true
 log_cli_level = "DEBUG"
 log_level = "DEBUG"
 
-[tool.ty]
-python_version = "3.12"
+[tool.ty.environment]
+python-version = "3.12"
+
+[tool.ty.src]
+include = ["src", "tests"]
 exclude = ['tests/test_download.py', 'tests/conftest.py']
 
 [dependency-groups]
