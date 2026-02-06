@@ -1,4 +1,4 @@
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 
 from omegaconf import OmegaConf
@@ -6,7 +6,6 @@ from omegaconf import OmegaConf
 __all__ = [
     "AOIConfig",
     "TimeRangeConfig",
-    "CloudFilterConfig",
     "Config",
     "load",
 ]
@@ -76,22 +75,6 @@ class TimeRangeConfig:
 
 
 @dataclass
-class CloudFilterConfig:
-    """
-    Cloud filtering configuration.
-
-    Attributes
-    ----------
-    max_cloud_percent : float | None
-        Maximum cloud percentage allowed (0-100).
-        Images above this threshold will be filtered out.
-        Defaults to None (no filtering).
-    """
-
-    max_cloud_percent: float | None = None
-
-
-@dataclass
 class Config:
     """
     Main configuration for Landsat dataset creation.
@@ -104,17 +87,11 @@ class Config:
         Time range configuration.
     output_dir : Path
         Directory where the dataset will be created.
-    cloud_filter : CloudFilterConfig | None
-        Cloud filtering configuration. Defaults to None.
-    parallel_jobs : int
-        Number of parallel download jobs. Defaults to 4.
     """
 
     aoi: AOIConfig
     time_range: TimeRangeConfig
     output_dir: Path
-    cloud_filter: CloudFilterConfig | None = field(default=None)
-    parallel_jobs: int = 4
 
     def __post_init__(self) -> None:
         self.output_dir = Path(self.output_dir).expanduser().absolute()

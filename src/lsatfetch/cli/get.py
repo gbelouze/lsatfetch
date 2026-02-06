@@ -11,13 +11,18 @@ from lsatfetch.tile import tiles_intersecting
 log = logging.getLogger(__name__)
 
 
-def get(config_path: Path, postprocess: bool = False, quality: int = 50) -> None:
+def get(
+    config_path: Path,
+    postprocess: bool = False,
+    quality: int = 50,
+    parallel_jobs: int = 4,
+) -> None:
     log.debug("Loading configuration")
     cfg = load(config_path)
     log.info(f"Configuration loaded from {config_path}")
     log.info(f"Output directory: {cfg.output_dir}")
     log.debug(f"AOI type: {cfg.aoi.type}")
-    log.debug(f"Parallel jobs: {cfg.parallel_jobs}")
+    log.debug(f"Parallel jobs: {parallel_jobs}")
 
     log.info("Identifying tiles...")
     if cfg.aoi.type == "bbox" and cfg.aoi.left is not None:
@@ -50,7 +55,7 @@ def get(config_path: Path, postprocess: bool = False, quality: int = 50) -> None
         start_date=start_date,
         end_date=end_date,
         output_dir=cfg.output_dir,
-        parallel_jobs=cfg.parallel_jobs,
+        parallel_jobs=parallel_jobs,
         postprocess=postprocess,
         quality=quality,
     )

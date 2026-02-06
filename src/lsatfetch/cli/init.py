@@ -36,10 +36,6 @@ def init(
             "end": "2021-01-01",
         },
         "output_dir": str(output_path.parent),
-        # "cloud_filter": {
-        #     "max_cloud_percent": 20,
-        # },
-        "parallel_jobs": 4,
     }
 
     with output_path.open("w") as f:

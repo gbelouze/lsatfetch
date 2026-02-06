@@ -21,7 +21,6 @@ def status(config: Path) -> None:
     log.info("Configuration loaded")
     log.info(f"  Output directory: {cfg.output_dir}")
     log.info(f"  AOI type: {cfg.aoi.type}")
-    log.info(f"  Parallel jobs: {cfg.parallel_jobs}")
 
     output_dir = Path(cfg.output_dir)
     if output_dir.exists():

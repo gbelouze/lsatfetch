@@ -45,6 +45,7 @@ def get(
     verbose: bool = False,
     postprocess: bool = False,
     quality: int = 50,
+    parallel_jobs: int = 4,
 ) -> None:
     """
     Create a Landsat dataset based on the provided configuration.
@@ -59,11 +60,13 @@ def get(
         Enable post-processing (compression to JP2). Defaults to False.
     quality : int
         JPEG2000 compression quality (1-100). Defaults to 50.
+    parallel_jobs : int
+        Number of parallel download jobs. Defaults to 4.
     """
     _setup_logging(level=logging.DEBUG if verbose else logging.INFO)
     from lsatfetch.cli.get import get as get_cmd
 
-    get_cmd(config, postprocess, quality)
+    get_cmd(config, postprocess, quality, parallel_jobs)
 
 
 @app.command  # type: ignore[misc]
