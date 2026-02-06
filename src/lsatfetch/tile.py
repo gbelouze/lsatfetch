@@ -335,4 +335,4 @@ def tiles_intersecting(aoi: Polygon) -> list[Tile]:
     list[Tile]
         List of tiles that intersect the geometry.
     """
-    return [t for t in generate_all_tiles() if t.box.intersects(aoi)]
+    return [t for t in generate_all_tiles() if t.box.intersects(aoi) and not t.box.touches(aoi)]

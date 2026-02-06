@@ -1,8 +1,9 @@
+import asyncio
 import logging
 import multiprocessing as mp
 import shutil
 import tempfile
-from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 from contextlib import ExitStack
 from datetime import date, datetime
 from pathlib import Path
@@ -17,7 +18,7 @@ from botocore.exceptions import ClientError
 from rich.progress import Progress
 from shapely.geometry import Polygon
 
-from lsatfetch.const import GLAD_LANDSAT_BUCKET
+from lsatfetch.const import GLAD_LANDSAT_BUCKET, MAX_PIXEL, MIN_PIXEL
 from lsatfetch.tile import (
     Period,
     Tile,
@@ -30,7 +31,8 @@ from lsatfetch.utils.log_multiprocessing import (
     LogQueueConsumer,
     init_log_queue_for_children,
 )
-from lsatfetch.utils.progress import default_bar, temporary_task
+from lsatfetch.utils.multiprocessing import SequentialExecutor
+from lsatfetch.utils.progress import default_bar, lsat_debug, temporary_task
 from lsatfetch.utils.stats import (
     ImageStatistics,
     Statistics,
@@ -88,7 +90,18 @@ def download_tile(
     output_path.parent.mkdir(exist_ok=True)
 
     if output_path.exists():
-        log.debug(f"Tile already exists: {s3_key}. Skipping.")
+        log.debug(f"Tile already exists: {s3_key}. Skipping download.")
+        return
+    if output_path.with_suffix(".jp2").exists():
+        log.debug(f"Tile already exists as a compressed tile: {s3_key}. Skipping download.")
+        return
+
+    file_id = str(output_path.relative_to(output_dir))
+    statistics = Statistics(output_dir / "meta.duckdb")
+    stat = statistics.get(file_id)
+    if stat is not None and stat["discarded"]:
+        log.debug(f"Tile has been marked as discarded: {s3_key}. Skipping download.")
+        return
 
     s3 = _get_s3_client()
 
@@ -108,7 +121,7 @@ def download_tile(
             task = stack.enter_context(
                 temporary_task(
                     progress,
-                    f"[cyan]{tile.tile_id}",
+                    f"[cyan]{tile.tile_id}::{Path(s3_key).stem}",
                     total=file_size // 1_000_000,
                 )
             )
@@ -173,8 +186,8 @@ def compress_landsat_image(input_path: Path, output_path: Path, quality: int = 5
 
         nbands = bands_data.shape[0]
 
-        arr = np.clip(masked_data, 0, 2**16 - 1)
-        arr = (arr / 2**8) * ((255 * 2**8) / (2**16 - 1))
+        arr = np.clip(masked_data, MIN_PIXEL, MAX_PIXEL)
+        arr = 255 * (arr - MIN_PIXEL) / (MAX_PIXEL - MIN_PIXEL)
         arr = arr.astype("uint8")
 
         profile.update(
@@ -187,6 +200,9 @@ def compress_landsat_image(input_path: Path, output_path: Path, quality: int = 5
             blockxsize=256,
             blockysize=256,
         )
+        del profile["tiled"]
+        del profile["interleave"]
+        del profile["compress"]
 
         with tempfile.NamedTemporaryFile(suffix=".jp2", delete=False) as tmp_jp2:
             log.debug(f"Writing compressed raster to {tmp_jp2.name}")
@@ -219,24 +235,37 @@ def process_file(
     quality : int
         JPEG2000 compression quality. Defaults to 50.
     """
-    file_id = input_path.stem
+    file_id = str(input_path.relative_to(base_dir))
 
-    statistics = Statistics(base_dir / "meta.parquet")
+    statistics = Statistics(base_dir / "meta.duckdb")
 
     stat = statistics.get(file_id)
     if stat is None:
         pixel_stat = compute_pixel_statistics(input_path)
+        log.debug("Statistics not found. Computing.")
     else:
         pixel_stat = {k: stat[k] for k in ["discarded", "n_valid_initial", "n_valid_final"]}
 
     if pixel_stat["discarded"]:
         log.info(f"Discarding {file_id}: >=80% nodata ({pixel_stat['n_valid_final']} valid pixels)")
+        statistics[file_id] = ImageStatistics(
+            file_id=file_id,
+            n_valid_initial=pixel_stat["n_valid_initial"],
+            n_valid_final=pixel_stat["n_valid_final"],
+            discarded=pixel_stat["discarded"],
+            processed_at=stat["processed_at"] if stat is not None else datetime.now(),
+            size_bytes=input_path.stat().st_size,
+            compressed_size_bytes=None,
+        )
+        statistics[file_id] = stat
         return None
 
-    output_path = base_dir / "landsat" / input_path.with_suffix(".jp2").name
+    output_path = input_path.with_suffix(".jp2")
     size_bytes = input_path.stat().st_size
     compress_landsat_image(input_path, output_path, quality)
+
     if input_path.exists():  # compression was skipped
+        log.info(f"{input_path} has already been compressed. Skipping.")
         return None
 
     stat = ImageStatistics(
@@ -285,30 +314,38 @@ def get(
     Returns
     -------
     tuple[int, int]
-        Tuple of (n_downloaded, n_skipped) indicating how many tiles
+        Tuple of (n_downloaded, n_processed) indicating how many tiles
         were successfully downloaded and how many were skipped.
     """
     tiles = tiles_intersecting(aoi)
     periods = time_indices_for_range(start_date, end_date)
-
     tasks = [(tile, period) for tile in tiles for period in periods]
     log.info(f"Identified {len(tiles)} tiles and {len(periods)} periods.")
 
     output_dir = Path(output_dir).expanduser().absolute()
     output_dir.mkdir(parents=True, exist_ok=True)
+    return asyncio.run(_get_async(tasks, output_dir, parallel_jobs, postprocess, quality))
+
+
+async def _get_async(
+    tasks: list[Tile, Period], output_dir: Path, parallel_jobs: int, postprocess: bool, quality: int
+) -> tuple[int, int]:
+    loop = asyncio.get_running_loop()
 
     with mp.Manager() as manager:
         log_queue = cast(LogQueue, manager.Queue())
+        pp_executor = ProcessPoolExecutor if not lsat_debug() else SequentialExecutor
         with (
-            ProcessPoolExecutor(
+            pp_executor(
                 max_workers=parallel_jobs,
                 initializer=init_log_queue_for_children,
                 initargs=(log_queue,),
-            ) as postprocess_executor,
+            ) as pp_pool,
+            ThreadPoolExecutor(max_workers=parallel_jobs) as dl_pool,
             LogQueueConsumer(log_queue),
             default_bar() as progress,
         ):
-            postprocess_task = (
+            pp_bar = (
                 progress.add_task(
                     "[cyan]Processing downloaded tiles...[/]",
                     total=1,
@@ -316,93 +353,97 @@ def get(
                 if postprocess
                 else None
             )
-
-            with (
-                ThreadPoolExecutor(max_workers=parallel_jobs) as download_executor,
-                temporary_task(
-                    progress,
-                    "[cyan]Downloading Landsat ARD tiles...[/]",
-                    total=len(tasks),
-                ) as download_task,
-            ):
-                download_futures = {
-                    download_executor.submit(download_tile, tile, period, output_dir, progress): (
-                        tile,
-                        period,
-                    )
-                    for tile, period in tasks
-                }
-                postprocess_futures = []
-
-                n_failures = 0
-                n_downloaded = 0
-                n_filtered_out = 0
-                first_failure = None
-                try:
-                    for future in as_completed(download_futures):
-                        tile, period = download_futures[future]
-                        try:
-                            downloaded_path = future.result()
-                            if downloaded_path is not None:
-                                n_downloaded += 1
-                                if postprocess:
-                                    postprocess_future = postprocess_executor.submit(
-                                        process_file,
-                                        downloaded_path,
-                                        downloaded_path.with_suffix(".jp2"),
-                                        quality,
-                                    )
-                                    postprocess_futures.append(postprocess_future)
-                                    progress.update(
-                                        postprocess_task, total=postprocess_task.total + 1
-                                    )
-                            else:
-                                n_filtered_out += 1
-                        except Exception as e:
-                            log.error(
-                                f"Error downloading {tile.tile_id} for period {period.n}: {e}"
-                            )
-                            n_failures += 1
-                            first_failure = first_failure if first_failure is not None else e
-                        finally:
-                            progress.advance(download_task)
-                except KeyboardInterrupt:
-                    download_executor.shutdown(wait=False, cancel_futures=True)
-                    log.error(
-                        "Keyboard interrupt. "
-                        "Please wait while current download finish (up to a few minutes)."
-                    )
-                    raise
-                if n_failures > 0:
-                    raise DownloadError(
-                        f"Failed to download {n_failures} tiles."
-                    ) from first_failure
-
-            log.info(
-                f"[green]Finished[/]: downloaded {n_downloaded} tiles, skipped {n_filtered_out}"
+            dl_bar = progress.add_task(
+                "[cyan]Downloading Landsat ARD tiles...[/]", total=len(tasks)
             )
 
-            n_processed = 0
-            n_filtered_out = 0
-            if postprocess:
-                try:
-                    for future in as_completed(postprocess_futures):
-                        result = future.result()
-                        if result is not None:
-                            n_processed += 1
-                        else:
-                            n_filtered_out += 1
-                        progress.advance(postprocess_task)
-                except KeyboardInterrupt:
-                    download_executor.shutdown(wait=False, cancel_futures=True)
-                    log.error(
-                        "Keyboard interrupt. "
-                        "Please wait while current processing finish (up to a few minutes)."
-                    )
-                    raise
-                log.info(
-                    f"Processed {n_processed} tiles. Filtered out {n_filtered_out} tiles "
-                    f"({100 * n_filtered_out / (n_processed + n_filtered_out):.1f}%)."
-                )
+            n_pp = 0
 
-    return n_processed if postprocess else n_downloaded
+            pp_futures = {}
+            dl_futures = {
+                loop.run_in_executor(dl_pool, download_tile, tile, period, output_dir, progress): (
+                    tile,
+                    period,
+                )
+                for tile, period in tasks
+            }
+
+            n_failures = 0
+            n_downloaded = 0
+            n_processed = 0
+            n_dl_filtered_out = 0
+            n_pp_filtered_out = 0
+            first_failure = None
+
+            try:
+                while dl_futures or pp_futures:
+                    all_active = list(dl_futures.keys()) + list(pp_futures.keys())
+                    done, _ = await asyncio.wait(all_active, return_when=asyncio.FIRST_COMPLETED)
+
+                    for task in done:
+                        if task in dl_futures:
+                            tile, period = dl_futures.pop(task)
+                            try:
+                                downloaded_path = task.result()
+                                if downloaded_path is not None:
+                                    n_downloaded += 1
+                                    if postprocess:
+                                        pp_future = loop.run_in_executor(
+                                            pp_pool,
+                                            process_file,
+                                            downloaded_path,
+                                            output_dir,
+                                            quality,
+                                        )
+                                        pp_futures[pp_future] = downloaded_path
+                                        n_pp += 1
+                                        progress.update(pp_bar, total=n_pp)
+                                else:
+                                    n_dl_filtered_out += 1
+                            except Exception as e:
+                                log.error(
+                                    f"Error downloading {tile.tile_id} for period {period.n}: {e}"
+                                )
+                                n_failures += 1
+                                first_failure = first_failure if first_failure is not None else e
+                            finally:
+                                progress.advance(dl_bar)
+
+                        elif task in pp_futures:
+                            downloaded_path = pp_futures.pop(task)
+                            try:
+                                res = task.result()
+                                if res is not None:
+                                    n_processed += 1
+                                else:
+                                    n_pp_filtered_out += 1
+                            except Exception as e:
+                                log.error(f"Error processing {downloaded_path}: {e}")
+                                n_failures += 1
+                                first_failure = first_failure if first_failure is not None else e
+                            finally:
+                                progress.advance(pp_bar)
+            except (KeyboardInterrupt, asyncio.CancelledError):
+                log.warning("[yellow]Interrupt received. Please wait for cleanup...[/]")
+
+                for task in dl_futures:
+                    task.cancel()
+                dl_pool.shutdown(wait=False, cancel_futures=True)
+                pp_pool.shutdown(wait=False, cancel_futures=True)
+                raise
+
+            if n_failures > 0:
+                raise DownloadError(
+                    f"{n_failures} failure(s) during download/processing."
+                ) from first_failure
+
+            log.info(
+                f"[green]Finished[/]: downloaded {n_downloaded} tiles, skipped {n_dl_filtered_out}"
+            )
+
+            log.info(
+                f"Processed {n_processed} tiles. Filtered out {n_pp_filtered_out} tiles "
+                f"({100 * n_pp_filtered_out / (n_processed + n_pp_filtered_out):.1f}%)."
+            )
+
+    return n_downloaded, n_processed

@@ -14,12 +14,10 @@ dependencies = [
     "omegaconf>=2.3.0",
     "pooch>=1.8.2",
     "pyarrow>=18.0.0",
-    "pystac>=1.14.3",
     "pytest>=9.0.2",
     "rasterio>=1.5.0",
     "rich>=14.2.0",
     "s3fs>=2026.1.0",
-    "watchdog>=6.0.0",
 ]
 
 [project.scripts]
@@ -125,6 +123,7 @@ pythonVersion = "3.12"
 [dependency-groups]
 dev = [
     "ipdb>=0.13.13",
+    "catppuccin>=2.5.0",
     "moto>=5.1.20",
     "mypy>=1.19.1",
     "pre-commit>=4.5.1",
