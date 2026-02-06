@@ -4,7 +4,7 @@ import logging
 from collections.abc import Iterator, MutableMapping
 from datetime import datetime
 from pathlib import Path
-from typing import Any, TypedDict
+from typing import Any, Generic, TypedDict, TypeVar, cast
 
 import duckdb
 import rasterio as rio
@@ -36,7 +36,10 @@ class ProcessResult(TypedDict):
     compressed_size_bytes: int | None
 
 
-class TableManager(MutableMapping[str, Any]):
+T = TypeVar("T", DownloadResult, ProcessResult)
+
+
+class TableManager(MutableMapping[str, T], Generic[T]):
     """Helper to manage a specific table with a dict-like interface."""
 
     def __init__(self, meta: "Meta", table_name: str, schema: dict[str, str]):
@@ -45,14 +48,14 @@ class TableManager(MutableMapping[str, Any]):
         self.schema = schema
         self._columns = list(schema.keys())
 
-    def __getitem__(self, key: str) -> dict[str, Any]:
+    def __getitem__(self, key: str) -> T:
         query = f"SELECT * FROM {self.table} WHERE id = ?"
         row = self.meta.con.execute(query, [key]).fetchone()
         if not row:
             raise KeyError(key)
-        return dict(zip(self._columns, row, strict=True))
+        return cast(T, dict(zip(self._columns, row, strict=True)))
 
-    def __setitem__(self, key: str, value: dict[str, Any]):
+    def __setitem__(self, key: str, value: T) -> None:
         cols = ", ".join(self._columns)
         placeholders = ", ".join(["?"] * len(self._columns))
         query = f"INSERT OR REPLACE INTO {self.table} ({cols}) VALUES ({placeholders})"
@@ -62,7 +65,7 @@ class TableManager(MutableMapping[str, Any]):
         data = [value.get(col) for col in self._columns]
         self.meta.con.execute(query, data)
 
-    def __delitem__(self, key: str):
+    def __delitem__(self, key: str) -> None:
         if key not in self:
             raise KeyError(key)
         self.meta.con.execute(f"DELETE FROM {self.table} WHERE id = ?", [key])
@@ -72,7 +75,10 @@ class TableManager(MutableMapping[str, Any]):
         return iter([r[0] for r in res])
 
     def __len__(self) -> int:
-        return self.meta.con.execute(f"SELECT count(*) FROM {self.table}").fetchone()[0]
+        count = self.meta.con.execute(f"SELECT count(*) FROM {self.table}").fetchone()
+        if count is None:
+            raise RuntimeError("count(*) failed to return a value.")
+        return int(count[0])
 
     def __contains__(self, key: Any) -> bool:
         res = self.meta.con.execute(f"SELECT 1 FROM {self.table} WHERE id = ?", [key]).fetchone()
@@ -84,7 +90,7 @@ class Meta:
 
     def __init__(self, db_path: Path):
         self.db_path = db_path
-        self.con: duckdb.DuckDBPyConnection | None = None
+        self._con: duckdb.DuckDBPyConnection | None = None
 
         # Define schemas
         self._dl_schema = {
@@ -109,22 +115,41 @@ class Meta:
             self._create_table("downloads", self._dl_schema)
             self._create_table("postprocessing", self._pp_schema)
 
-        self.dl = TableManager(self, "downloads", self._dl_schema)
-        self.pp = TableManager(self, "postprocessing", self._pp_schema)
+        self.dl: TableManager[DownloadResult] = TableManager(self, "downloads", self._dl_schema)
+        self.pp: TableManager[ProcessResult] = TableManager(self, "postprocessing", self._pp_schema)
 
-    def _create_table(self, name: str, schema: dict[str, str]):
+    @property
+    def con(self) -> duckdb.DuckDBPyConnection:
+        """Get the active database connection.
+
+        Returns
+        -------
+        duckdb.DuckDBPyConnection
+            The active DuckDB connection.
+
+        Raises
+        ------
+        RuntimeError
+            If the connection is not active (i.e., not within a 'with' block).
+        """
+        if self._con is None:
+            msg = "Database connection is not active. Use Meta as a context manager."
+            raise RuntimeError(msg)
+        return self._con
+
+    def _create_table(self, name: str, schema: dict[str, str]) -> None:
         cols = ", ".join([f"{k} {v}" for k, v in schema.items()])
         self.con.execute(f"CREATE TABLE IF NOT EXISTS {name} ({cols})")
 
     def __enter__(self) -> "Meta":
-        if self.con is None:
-            self.con = duckdb.connect(str(self.db_path))
+        if self._con is None:
+            self._con = duckdb.connect(str(self.db_path))
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        if self.con:
-            self.con.close()
-            self.con = None
+        if self._con:
+            self._con.close()
+            self._con = None
 
 
 def compute_pixel_statistics(tif_path: Path) -> dict[str, Any]:
@@ -177,8 +202,7 @@ def report_statistics(db_path: Path) -> None:
     """
     from rich.table import Table
 
-    meta = Meta(db_path)
-    with meta:
+    with Meta(db_path) as meta:
         # Join tables to get a comprehensive view
         query = """
             SELECT

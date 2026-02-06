@@ -327,8 +327,6 @@ async def _get_async(
         log_queue = cast(LogQueue, manager.Queue())
         pp_executor = ProcessPoolExecutor if not lsat_debug() else SequentialExecutor
 
-        meta = Meta(output_dir / "meta.duckdb")
-
         with (
             pp_executor(
                 max_workers=parallel_jobs,
@@ -338,7 +336,7 @@ async def _get_async(
             ThreadPoolExecutor(max_workers=parallel_jobs) as dl_pool,
             LogQueueConsumer(log_queue),
             default_bar() as progress,
-            meta,
+            Meta(output_dir / "meta.duckdb") as meta,
         ):
             pp_bar = (
                 progress.add_task(
@@ -354,7 +352,7 @@ async def _get_async(
 
             n_pp_submitted = 0
             pp_futures: dict[asyncio.Future[ProcessResult], str] = {}
-            dl_futures: dict[asyncio.Future[DownloadResult], str] = {}
+            dl_futures: dict[asyncio.Future[DownloadResult | None], tuple[Tile, Period, str]] = {}
 
             n_failures = 0
             n_downloaded = 0
@@ -402,7 +400,8 @@ async def _get_async(
                             )
                             pp_futures[pp_future] = tile_id
                             n_pp_submitted += 1
-                            progress.update(pp_bar, total=n_pp_submitted)
+                            if pp_bar is not None:
+                                progress.update(pp_bar, total=n_pp_submitted)
                     continue
 
                 # Submit download task
@@ -418,17 +417,18 @@ async def _get_async(
 
                     for task in done:
                         if task in dl_futures:
+                            task = cast(asyncio.Future[DownloadResult | None], task)
                             tile, period, tile_id = dl_futures.pop(task)
                             try:
-                                res: DownloadResult | None = task.result()
-                                if res is not None:
-                                    meta.dl[tile_id] = res
-                                    if res["is_missing"]:
+                                dl_res: DownloadResult | None = task.result()
+                                if dl_res is not None:
+                                    meta.dl[tile_id] = dl_res
+                                    if dl_res["is_missing"]:
                                         n_dl_skipped += 1
                                     else:
                                         n_downloaded += 1
                                         if postprocess:
-                                            tif_path = Path(res["path"])
+                                            tif_path = Path(dl_res["path"])
                                             pp_future = loop.run_in_executor(
                                                 pp_pool,
                                                 process_file,
@@ -438,7 +438,8 @@ async def _get_async(
                                             )
                                             pp_futures[pp_future] = tile_id
                                             n_pp_submitted += 1
-                                            progress.update(pp_bar, total=n_pp_submitted)
+                                            if pp_bar is not None:
+                                                progress.update(pp_bar, total=n_pp_submitted)
                                 else:
                                     # Unexpected None (error logged in worker)
                                     n_failures += 1
@@ -450,11 +451,12 @@ async def _get_async(
                                 progress.advance(dl_bar)
 
                         elif task in pp_futures:
+                            task = cast(asyncio.Future[ProcessResult], task)
                             tile_id = pp_futures.pop(task)
                             try:
-                                res: ProcessResult = task.result()
-                                meta.pp[tile_id] = res
-                                if res["discarded"]:
+                                pp_res: ProcessResult = task.result()
+                                meta.pp[tile_id] = pp_res
+                                if pp_res["discarded"]:
                                     n_pp_skipped += 1
                                 else:
                                     n_processed += 1

@@ -17,7 +17,7 @@ def _setup_logging(level: int = logging.INFO) -> None:
     setup(level=level)
 
 
-@app.command  # type: ignore[misc]
+@app.command
 def init(
     output: Path | None = None,
     force: bool = False,
@@ -39,7 +39,7 @@ def init(
     init_cmd(output, force)
 
 
-@app.command  # type: ignore[misc]
+@app.command
 def get(
     config: Path,
     verbose: bool = False,
@@ -69,7 +69,7 @@ def get(
     get_cmd(config, postprocess, quality, parallel_jobs)
 
 
-@app.command  # type: ignore[misc]
+@app.command
 def status(
     config: Path,
 ) -> None:

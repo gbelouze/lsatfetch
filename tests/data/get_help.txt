@@ -11,4 +11,6 @@ Create a Landsat dataset based on the provided configuration.
 │      --no-postprocess         Defaults to False. [default: False]            │
 │    QUALITY --quality          JPEG2000 compression quality (1-100). Defaults │
 │                               to 50. [default: 50]                           │
+│    PARALLEL-JOBS              Number of parallel download jobs. Defaults to  │
+│      --parallel-jobs          4. [default: 4]                                │
 ╰──────────────────────────────────────────────────────────────────────────────╯

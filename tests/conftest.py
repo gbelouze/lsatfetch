@@ -7,6 +7,18 @@ import pytest
 TESTS_DIR = Path(__file__).parent
 
 
+def pytest_configure(config: pytest.Config) -> None:
+    """Register custom pytest marks."""
+    config.addinivalue_line(
+        "markers",
+        "network: marks tests as requiring network access to external services",
+    )
+    config.addinivalue_line(
+        "markers",
+        "integration: marks tests as integration tests (may be slow, require network)",
+    )
+
+
 @pytest.fixture
 def sample_config_path(tmp_path: Path) -> Path:
     """
@@ -21,7 +33,6 @@ def sample_config_path(tmp_path: Path) -> Path:
     content = content.replace("top: 51", "top: 42.5")
     content = content.replace('start: "2020-01-01"', 'start: "2020-01-01"')
     content = content.replace('end: "2024-01-01"', 'end: "2020-01-16"')
-    content = content.replace("parallel_jobs: 2", "parallel_jobs: 4")
     dest.write_text(content)
     return dest
 

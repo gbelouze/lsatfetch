@@ -339,7 +339,8 @@ class TestDownloadTile:
 
             if exists:
                 assert result is not None
-                assert result.exists()
-                assert result.read_bytes() == b"fake tile data"
+                assert Path(result["path"]).exists()
+                assert Path(result["path"]).read_bytes() == b"fake tile data"
             else:
-                assert result is None
+                assert result is not None
+                assert result["is_missing"] is True

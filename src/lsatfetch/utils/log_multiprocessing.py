@@ -40,9 +40,9 @@ from multiprocessing.queues import Queue
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    LogQueue: type = Queue[logging.LogRecord]  # pid, record
+    LogQueue = Queue[logging.LogRecord]  # pid, record
 else:
-    LogQueue: type = Queue
+    LogQueue = Queue
 
 # Global queue (set by init in child processes)
 log_queue: LogQueue | None = None

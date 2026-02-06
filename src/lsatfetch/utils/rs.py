@@ -3,6 +3,7 @@ import logging
 import geopandas
 import pooch
 import shapely
+import shapely.ops
 from thefuzz import process
 
 log = logging.getLogger(__name__)

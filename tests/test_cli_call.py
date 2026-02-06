@@ -99,4 +99,3 @@ def test_init_generated_config_is_valid(tmp_path: Path) -> None:
     assert cfg.time_range.start == "2020-01-01"
     assert cfg.time_range.end == "2021-01-01"
     assert cfg.output_dir == output_path.parent
-    assert cfg.parallel_jobs == 4
