@@ -26,12 +26,23 @@ repos:
     rev: v1.13.0
     hooks:
       - id: mypy
-        additional_dependencies: ["earthengine-api", "types-retry", "types-requests", "geobbox==0.1.0"]
+        additional_dependencies: ["types-retry", "types-requests"]
         pass_filenames: false
         fail_fast: true
         args: ["src"]
+  - repo: local
+    hooks:
+      - id: ty
+        name: ty check
+        entry: uvx ty check .
+        language: python
   - repo: https://github.com/jsh9/pydoclint
     rev: 0.6.2
     hooks:
       - id: pydoclint-flake8
-        args: [--style=numpy, --check-return-types=False, --check-style-mismatch=True]
+        args:
+          [
+            --style=numpy,
+            --check-return-types=False,
+            --check-style-mismatch=True,
+          ]

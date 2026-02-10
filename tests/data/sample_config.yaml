@@ -8,4 +8,3 @@ time_range:
   start: "2020-01-01"
   end: "2024-01-01"
 output_dir: /tmp/landsat_test
-parallel_jobs: 2

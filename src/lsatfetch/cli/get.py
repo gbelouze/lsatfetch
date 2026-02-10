@@ -1,60 +1,85 @@
 import logging
+from datetime import datetime
 from pathlib import Path
-from typing import Annotated
 
-import cyclopts
+import geopandas as gpd
+from shapely import box
+from shapely.geometry import MultiPolygon, Polygon
 
 from lsatfetch.cli.config import load
-from lsatfetch.core import (
-    estimate_download_size,
-    estimate_download_time,
-    identify_tiles,
-)
+from lsatfetch.core import get as download_landsat
+from lsatfetch.tile import tiles_intersecting
+from lsatfetch.utils.rs import load_country_filter_polygon
 
 log = logging.getLogger(__name__)
-app = cyclopts.App(name="lsatfetch")
 
 
-@app.command
-def get(config: Annotated[Path, cyclopts.Parameter("c")]) -> None:
-    """
-    Create a Landsat dataset based on the provided configuration.
-
-    Parameters
-    ----------
-    config : Path
-        Path to the configuration YAML file.
-    """
-    log.info("Loading configuration...")
-    cfg = load(config)
-    log.info(f"Configuration loaded from {config}")
-    log.info(f"  Output directory: {cfg.output_dir}")
-    log.info(f"  AOI type: {cfg.aoi.type}")
-    log.info(f"  Parallel jobs: {cfg.parallel_jobs}")
+def get(
+    config_path: Path,
+    postprocess: bool = False,
+    quality: int = 50,
+    parallel_jobs: int = 4,
+) -> None:
+    log.debug("Loading configuration")
+    cfg = load(config_path)
+    log.info(f"Configuration loaded from {config_path}")
+    log.info(f"Output directory: {cfg.output_dir}")
+    log.debug(f"AOI type: {cfg.aoi.type}")
+    log.debug(f"Parallel jobs: {parallel_jobs}")
 
     log.info("Identifying tiles...")
-    aoi_bbox = None
-    if cfg.aoi.type == "bbox" and cfg.aoi.left is not None:
-        aoi_bbox = (cfg.aoi.left, cfg.aoi.bottom, cfg.aoi.right, cfg.aoi.top)
-    if aoi_bbox is None:
-        log.warning("No AOI bbox found. Skipping tile identification.")
+    if cfg.aoi.type == "bbox":
+        left = cfg.aoi.left
+        bottom = cfg.aoi.bottom
+        right = cfg.aoi.right
+        top = cfg.aoi.top
+        assert left is not None
+        assert bottom is not None
+        assert right is not None
+        assert top is not None
+        aoi_geom = box(left, bottom, right, top)
+    elif cfg.aoi.type == "vector":
+        assert cfg.aoi.vector is not None
+        log.info(f"Reading AOI from {cfg.aoi.vector}")
+        gdf = gpd.read_file(cfg.aoi.vector)
+        if gdf.crs is not None and gdf.crs != "EPSG:4326":
+            log.info(f"Reprojecting AOI from {gdf.crs} to EPSG:4326")
+            gdf = gdf.to_crs("EPSG:4326")
+        aoi_geom = gdf.unary_union
+        if not isinstance(aoi_geom, Polygon | MultiPolygon):
+            msg = f"AOI must be a Polygon or MultiPolygon, got {type(aoi_geom)}"
+            raise ValueError(msg)
+    elif cfg.aoi.type == "country":
+        assert cfg.aoi.country is not None
+        log.info(f"Loading AOI for country: {cfg.aoi.country}")
+        aoi_geom = load_country_filter_polygon(cfg.aoi.country)
+        if aoi_geom is None:
+            log.warning("No AOI geometry found for country. Skipping tile identification.")
+            return
+    else:
+        log.warning("No AOI geometry found. Skipping tile identification.")
         return
 
-    tile_ids = identify_tiles(aoi_bbox)
+    tile_ids = tiles_intersecting(aoi_geom)
     log.info(f"Found {len(tile_ids)} tiles")
 
     if not tile_ids:
         log.warning("No tiles found for the specified AOI.")
         return
 
-    log.info("Estimating download...")
-    size_bytes = estimate_download_size(tile_ids)
-    size_mb = size_bytes / (1024 * 1024)
-    time_seconds = estimate_download_time(tile_ids, cfg.parallel_jobs)
-    time_minutes = time_seconds / 60
+    if cfg.time_range.start is None or cfg.time_range.end is None:
+        log.error("Time range not specified in configuration.")
+        return
 
-    log.info(f"  Estimated size: {size_mb:.1f} MB")
-    log.info(f"  Estimated time: {time_minutes:.1f} minutes")
+    start_date = datetime.strptime(cfg.time_range.start, "%Y-%m-%d").date()
+    end_date = datetime.strptime(cfg.time_range.end, "%Y-%m-%d").date()
 
-    log.warning("Download not yet implemented")
-    log.info("This is a placeholder for the download functionality.")
+    download_landsat(
+        aoi=aoi_geom,
+        start_date=start_date,
+        end_date=end_date,
+        output_dir=cfg.output_dir,
+        parallel_jobs=parallel_jobs,
+        postprocess=postprocess,
+        quality=quality,
+    )

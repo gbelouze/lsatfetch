@@ -1,26 +1,16 @@
 import logging
 from pathlib import Path
-from typing import Annotated
-
-import cyclopts
 
 from lsatfetch.cli.config import load
-
-app = cyclopts.App(name="status")
 
 log = logging.getLogger(__name__)
 
 
-@app.command
-def status(config: Annotated[Path, cyclopts.Parameter("c")]) -> None:
-    """
-    Show the status of a Landsat dataset.
+def status(config: Path) -> None:
+    from lsatfetch.utils.log import setup
 
-    Parameters
-    ----------
-    config : Path
-        Path to the configuration YAML file.
-    """
+    setup(level=logging.INFO)
+
     log.info("Dataset Status")
 
     if not config.exists():
@@ -31,7 +21,6 @@ def status(config: Annotated[Path, cyclopts.Parameter("c")]) -> None:
     log.info("Configuration loaded")
     log.info(f"  Output directory: {cfg.output_dir}")
     log.info(f"  AOI type: {cfg.aoi.type}")
-    log.info(f"  Parallel jobs: {cfg.parallel_jobs}")
 
     output_dir = Path(cfg.output_dir)
     if output_dir.exists():

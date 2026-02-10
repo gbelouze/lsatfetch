@@ -7,38 +7,48 @@ This document provides guidelines for agents working on this codebase.
 ### Installation
 
 ```bash
-pip install -e .              # Install package in editable mode
-pip install -e ".[dev]"       # Install with dev dependencies
-pre-commit install            # Install pre-commit hooks
+uv sync                     # Sync dependencies from pyproject.toml
+uv run pre-commit install   # Install pre-commit hooks
+```
+
+### Dependency Management
+
+```bash
+uv add <package>            # Add a dependency
+uv add <package> -D         # Add a dev dependency
+uv remove <package>         # Remove a dependency
+uv add -r requirements.txt  # Add from requirements file
 ```
 
 ### Running Tests
 
 ```bash
-pytest                        # Run all tests
-pytest tests/                 # Run tests from specific directory
-pytest -k "test_name"         # Run tests matching pattern
-pytest --markers              # List available markers
-pytest -m slow                # Run tests marked as slow
+uv run pytest                        # Run all tests
+uv run pytest tests/                 # Run tests from specific directory
+uv run pytest -k "test_name"         # Run tests matching pattern
+uv run pytest --markers              # List available markers
+uv run pytest -m slow                # Run tests marked as slow
 ```
 
 ### Type Checking
 
 ```bash
-mypy src/                     # Run mypy on src directory
-pyright                       # Run pyright (disabled by default)
+uvx ty check src/                     # Run ty on src directory
+uvx ty check tests/                   # Run ty on tests directory
 ```
 
 ### Linting and Formatting
 
 ```bash
-ruff check src/               # Run ruff linter
-ruff check --fix src/         # Run ruff with auto-fix
-ruff format src/              # Format code with ruff
-flake8                        # Run flake8 (pydoclint only)
-pre-commit run --all-files    # Run all pre-commit hooks
-pre-commit run ruff --all-files  # Run specific hook
+uv run ruff check --preview src/     # Run ruff linter
+uv run ruff check --fix --preview src/  # Run ruff with auto-fix (use --preview)
+uv run ruff format src/              # Format code with ruff
+uv run flake8                        # Run flake8 (pydoclint only)
+uv run pre-commit run --all-files    # Run all pre-commit hooks
+uv run pre-commit run ruff --all-files  # Run specific hook
 ```
+
+Note: Never call pip directly. Use `uv run <command>` or `uv run python -m <command>`.
 
 ## Code Style Guidelines
 
@@ -177,7 +187,7 @@ The repository uses pre-commit hooks that run:
 - `trailing-whitespace`
 - `check-merge-conflict`
 - `ruff` (lint + format)
-- `mypy` on `src/`
+- `ty` on `src/`
 - `pydoclint-flake8`
 
 Run `pre-commit run --all-files` to verify code quality before committing.
@@ -187,6 +197,6 @@ Run `pre-commit run --all-files` to verify code quality before committing.
 - Python: >=3.12
 - Linter: ruff
 - Formatter: ruff-format
-- Type checker: mypy (pyright disabled)
+- Type checker: ty (pyright disabled)
 - Docstring style: numpy (pydoclint)
 - Test runner: pytest

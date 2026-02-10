@@ -1,12 +1,19 @@
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
+from typing import TYPE_CHECKING, Any, Literal
 
 from omegaconf import OmegaConf
+
+if TYPE_CHECKING:
+    AOIType = Literal["bbox", "vector", "country"]
+    CountryType = str | list[str] | None
+else:
+    AOIType = str
+    CountryType = Any
 
 __all__ = [
     "AOIConfig",
     "TimeRangeConfig",
-    "CloudFilterConfig",
     "Config",
     "load",
 ]
@@ -34,6 +41,9 @@ class AOIConfig:
     vector : Path | None
         Path to vector file containing AOI shapes.
         Only used when type is 'vector'. Defaults to None.
+    country : str | list[str] | None
+        Country name(s) to load borders for.
+        Only used when type is 'country'. Defaults to None.
     """
 
     type: str = "bbox"
@@ -43,10 +53,11 @@ class AOIConfig:
     top: float | None = None
     crs: str = "EPSG:4326"
     vector: Path | None = None
+    country: CountryType = None
 
     def __post_init__(self) -> None:
-        if self.type not in ("bbox", "vector"):
-            msg = f"type must be 'bbox' or 'vector', got '{self.type}'"
+        if self.type not in ("bbox", "vector", "country"):
+            msg = f"type must be 'bbox', 'vector', or 'country', got '{self.type}'"
             raise ValueError(msg)
         if self.type == "bbox" and any(
             v is None for v in (self.left, self.bottom, self.right, self.top)
@@ -55,6 +66,9 @@ class AOIConfig:
             raise ValueError(msg)
         if self.type == "vector" and self.vector is None:
             msg = "vector must be provided when type is 'vector'"
+            raise ValueError(msg)
+        if self.type == "country" and self.country is None:
+            msg = "country must be provided when type is 'country'"
             raise ValueError(msg)
 
 
@@ -76,22 +90,6 @@ class TimeRangeConfig:
 
 
 @dataclass
-class CloudFilterConfig:
-    """
-    Cloud filtering configuration.
-
-    Attributes
-    ----------
-    max_cloud_percent : float | None
-        Maximum cloud percentage allowed (0-100).
-        Images above this threshold will be filtered out.
-        Defaults to None (no filtering).
-    """
-
-    max_cloud_percent: float | None = None
-
-
-@dataclass
 class Config:
     """
     Main configuration for Landsat dataset creation.
@@ -104,17 +102,11 @@ class Config:
         Time range configuration.
     output_dir : Path
         Directory where the dataset will be created.
-    cloud_filter : CloudFilterConfig | None
-        Cloud filtering configuration. Defaults to None.
-    parallel_jobs : int
-        Number of parallel download jobs. Defaults to 4.
     """
 
     aoi: AOIConfig
     time_range: TimeRangeConfig
     output_dir: Path
-    cloud_filter: CloudFilterConfig | None = field(default=None)
-    parallel_jobs: int = 4
 
     def __post_init__(self) -> None:
         self.output_dir = Path(self.output_dir).expanduser().absolute()
@@ -138,4 +130,4 @@ def load(path: Path) -> Config:
     structured = OmegaConf.structured(Config)
     merged = OmegaConf.merge(structured, from_yaml)
     OmegaConf.resolve(merged)
-    return OmegaConf.to_object(merged)  # type: ignore[return-value]
+    return OmegaConf.to_object(merged)  # type: ignore[no-any-return]

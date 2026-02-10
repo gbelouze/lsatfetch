@@ -1,5 +1,6 @@
 """Main entry point for lsatfetch CLI."""
 
+import logging
 from pathlib import Path
 
 import cyclopts
@@ -10,12 +11,29 @@ app = cyclopts.App(
 )
 
 
+def _setup_logging(level: int = logging.INFO) -> None:
+    from lsatfetch.utils.log import setup
+
+    setup(level=level)
+
+
 @app.command
 def init(
     output: Path | None = None,
     force: bool = False,
 ) -> None:
-    """Initialize a configuration template for Landsat dataset creation."""
+    """
+    Initialize a configuration template for Landsat dataset creation.
+
+    Parameters
+    ----------
+    output : Path | None
+        Path to save the configuration template.
+        If not provided, saves to current directory or output_dir if specified.
+    force : bool
+        Overwrite existing configuration file. Defaults to False.
+    """
+    _setup_logging()
     from lsatfetch.cli.init import init as init_cmd
 
     init_cmd(output, force)
@@ -24,45 +42,49 @@ def init(
 @app.command
 def get(
     config: Path,
+    verbose: bool = False,
+    postprocess: bool = False,
+    quality: int = 50,
+    parallel_jobs: int = 4,
 ) -> None:
-    """Create a Landsat dataset based on the provided configuration."""
+    """
+    Create a Landsat dataset based on the provided configuration.
+
+    Parameters
+    ----------
+    config : Path
+        Path to the configuration YAML file.
+    verbose : bool
+        Enable verbose (DEBUG) logging. Defaults to False.
+    postprocess : bool
+        Enable post-processing (compression to JP2). Defaults to False.
+    quality : int
+        JPEG2000 compression quality (1-100). Defaults to 50.
+    parallel_jobs : int
+        Number of parallel download jobs. Defaults to 4.
+    """
+    _setup_logging(level=logging.DEBUG if verbose else logging.INFO)
     from lsatfetch.cli.get import get as get_cmd
 
-    get_cmd(config)
+    get_cmd(config, postprocess, quality, parallel_jobs)
 
 
 @app.command
 def status(
     config: Path,
 ) -> None:
-    """Show the status of a Landsat dataset."""
+    """
+    Show the status of a Landsat dataset.
+
+    Parameters
+    ----------
+    config : Path
+        Path to the configuration YAML file.
+    """
     from lsatfetch.cli.status import status as status_cmd
 
     status_cmd(config)
 
 
-def main(
-    verbose: bool = False,
-    quiet: bool = False,
-    logfile: Path | None = None,
-    debug: bool = False,
-) -> None:
-    """Main entry point for the lsatfetch CLI."""
-    from lsatfetch.utils.log import setup
-
-    level = 0
-    if verbose:
-        level = logging.DEBUG
-    if quiet:
-        level = logging.ERROR
-    if debug:
-        level = logging.DEBUG
-    setup(level=level, logfile=logfile)
-
-    app()
-
-
 if __name__ == "__main__":
-    import logging
-
-    main()
+    app()
