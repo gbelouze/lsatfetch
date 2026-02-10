@@ -97,7 +97,7 @@ class TestCompressLandsatImage:
         assert result.exists()
         assert not input_path.exists()
         # Should no longer be "existing" since it's a real JP2 now
-        with open(output_path, "rb") as f:
+        with output_path.open("rb") as f:
             content = f.read(8)
             assert content != b"existing"
 

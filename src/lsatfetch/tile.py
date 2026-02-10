@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from datetime import date, timedelta
 
 from shapely import box
-from shapely.geometry import Polygon
+from shapely.geometry import MultiPolygon, Polygon
 
 from lsatfetch.const import GLAD_LANDSAT_BUCKET
 
@@ -321,13 +321,13 @@ def generate_all_tiles() -> list[Tile]:
     return tiles
 
 
-def tiles_intersecting(aoi: Polygon) -> list[Tile]:
+def tiles_intersecting(aoi: Polygon | MultiPolygon) -> list[Tile]:
     """
     Identify tiles that intersect with a given geometry.
 
     Parameters
     ----------
-    aoi : Polygon
+    aoi : Polygon | MultiPolygon
         Area of interest geometry.
 
     Returns

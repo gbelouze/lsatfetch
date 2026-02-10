@@ -4,7 +4,7 @@ import logging
 from collections.abc import Iterator, MutableMapping
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Generic, TypedDict, TypeVar, cast
+from typing import Any, TypedDict, cast
 
 import duckdb
 import rasterio as rio
@@ -36,10 +36,7 @@ class ProcessResult(TypedDict):
     compressed_size_bytes: int | None
 
 
-T = TypeVar("T", DownloadResult, ProcessResult)
-
-
-class TableManager(MutableMapping[str, T], Generic[T]):
+class TableManager[T: MutableMapping](MutableMapping[str, T]):
     """Helper to manage a specific table with a dict-like interface."""
 
     def __init__(self, meta: "Meta", table_name: str, schema: dict[str, str]):
@@ -115,8 +112,10 @@ class Meta:
             self._create_table("downloads", self._dl_schema)
             self._create_table("postprocessing", self._pp_schema)
 
-        self.dl: TableManager[DownloadResult] = TableManager(self, "downloads", self._dl_schema)
-        self.pp: TableManager[ProcessResult] = TableManager(self, "postprocessing", self._pp_schema)
+        self.dl: TableManager[dict[str, Any]] = TableManager(self, "downloads", self._dl_schema)
+        self.pp: TableManager[dict[str, Any]] = TableManager(
+            self, "postprocessing", self._pp_schema
+        )
 
     @property
     def con(self) -> duckdb.DuckDBPyConnection:

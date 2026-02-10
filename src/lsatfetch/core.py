@@ -16,7 +16,7 @@ import rasterio as rio
 from botocore.config import Config
 from botocore.exceptions import ClientError
 from rich.progress import Progress
-from shapely.geometry import Polygon
+from shapely.geometry import MultiPolygon, Polygon
 
 from lsatfetch.const import (
     GLAD_LANDSAT_BUCKET,
@@ -270,7 +270,7 @@ def process_file(
 
 
 def get(
-    aoi: Polygon,
+    aoi: Polygon | MultiPolygon,
     start_date: date,
     end_date: date,
     output_dir: Path,
@@ -287,7 +287,7 @@ def get(
 
     Parameters
     ----------
-    aoi : Polygon
+    aoi : Polygon | MultiPolygon
         Area of interest geometry.
     start_date : date
         Start date of the time period of interest.
