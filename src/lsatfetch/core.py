@@ -422,7 +422,7 @@ async def _get_async(
                             try:
                                 dl_res: DownloadResult | None = task.result()
                                 if dl_res is not None:
-                                    meta.dl[tile_id] = dl_res
+                                    meta.dl[tile_id] = dl_res  # ty:ignore[invalid-assignment]
                                     if dl_res["is_missing"]:
                                         n_dl_skipped += 1
                                     else:

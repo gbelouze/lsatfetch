@@ -16,7 +16,7 @@ log = logging.getLogger(__name__)
 
 def get(
     config_path: Path,
-    postprocess: bool = False,
+    postprocess: bool = True,
     quality: int = 50,
     parallel_jobs: int = 4,
 ) -> None:
