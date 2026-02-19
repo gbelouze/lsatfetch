@@ -16,6 +16,7 @@ log = logging.getLogger(__name__)
 
 def get(
     config_path: Path,
+    download: bool = True,
     postprocess: bool = True,
     quality: int = 50,
     parallel_jobs: int = 4,
@@ -80,6 +81,7 @@ def get(
         end_date=end_date,
         output_dir=cfg.output_dir,
         parallel_jobs=parallel_jobs,
+        download=download,
         postprocess=postprocess,
         quality=quality,
     )
