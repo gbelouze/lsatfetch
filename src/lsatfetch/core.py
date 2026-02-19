@@ -141,7 +141,7 @@ def download_tile(
                     Filename=str(tmp_path),
                     Callback=callback if progress is not None else None,
                 )
-                tmp_path.rename(output_path)
+                shutil.move(tmp_path, output_path)
 
             log.debug(f"Downloaded tile to {output_path}")
             return DownloadResult(
@@ -388,6 +388,8 @@ async def _get_async(
             n_pp_skipped = 0
             first_failure = None
 
+            # sort for spatial exhaustivity first, temporal second
+            tasks = sorted(tasks, key=lambda tp: (-tp[1].n, tp[0].lat, tp[0].lon))
             # Filter tasks before submitting
             for tile, period in tasks:
                 tile_id = f"{tile.lon_name}_{tile.lat_name}:{period.n}"
