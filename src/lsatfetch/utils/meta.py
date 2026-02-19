@@ -150,6 +150,48 @@ class Meta:
             self._con.close()
             self._con = None
 
+    def get_stats(self) -> dict[str, Any]:
+        """
+        Get aggregate statistics from the database.
+
+        Returns
+        -------
+        dict
+            Dictionary with keys:
+            - avg_tif_size: Average size of a TIFF file in bytes.
+            - avg_jp2_size: Average size of a JP2 file in bytes.
+            - dl_filter_rate: Proportion of missing tiles on S3.
+            - pp_filter_rate: Proportion of discarded tiles during processing.
+            - total_tif_bytes: Total size of all TIFF files in bytes.
+            - total_jp2_bytes: Total size of all JP2 files in bytes.
+        """
+        query_dl = """
+            SELECT
+                AVG(size_bytes) FILTER (WHERE NOT is_missing),
+                CAST(COUNT(*) FILTER (WHERE is_missing) AS FLOAT) / NULLIF(COUNT(*), 0),
+                SUM(size_bytes) FILTER (WHERE NOT is_missing)
+            FROM downloads
+        """
+        query_pp = """
+            SELECT
+                AVG(compressed_size_bytes) FILTER (WHERE NOT discarded),
+                CAST(COUNT(*) FILTER (WHERE discarded) AS FLOAT) / NULLIF(COUNT(*), 0),
+                SUM(compressed_size_bytes) FILTER (WHERE NOT discarded)
+            FROM postprocessing
+        """
+
+        dl_row = self.con.execute(query_dl).fetchone()
+        pp_row = self.con.execute(query_pp).fetchone()
+
+        return {
+            "avg_tif_size": dl_row[0] if dl_row else None,
+            "dl_filter_rate": dl_row[1] if dl_row else 0.0,
+            "total_tif_bytes": dl_row[2] if dl_row else 0,
+            "avg_jp2_size": pp_row[0] if pp_row else None,
+            "pp_filter_rate": pp_row[1] if pp_row else 0.0,
+            "total_jp2_bytes": pp_row[2] if pp_row else 0,
+        }
+
 
 def compute_pixel_statistics(tif_path: Path) -> dict[str, Any]:
     """
