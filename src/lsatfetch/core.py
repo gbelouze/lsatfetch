@@ -292,7 +292,8 @@ def get(
     start_date: date,
     end_date: date,
     output_dir: Path,
-    parallel_jobs: int = 4,
+    n_workers_dl: int = 4,
+    n_workers_pp: int = 4,
     download: bool = True,
     postprocess: bool = False,
     quality: int = 50,
@@ -314,8 +315,10 @@ def get(
         End date of the time period of interest.
     output_dir : Path
         Directory to save downloaded files.
-    parallel_jobs : int
+    n_workers_dl : int
         Number of parallel download jobs. Defaults to 4.
+    n_workers_pp : int
+        Number of parallel preprocessing jobs. Defaults to 4.
     download : bool
         Enable downloading of tiles. If False, only already downloaded tiles are processed.
         Defaults to True.
@@ -343,7 +346,8 @@ def get(
 async def _get_async(
     tasks: list[tuple[Tile, Period]],
     output_dir: Path,
-    parallel_jobs: int,
+    n_workers_dl: int,
+    n_workers_pp: int,
     download: bool,
     postprocess: bool,
     quality: int,
@@ -360,11 +364,11 @@ async def _get_async(
 
         with (
             pp_executor(
-                max_workers=parallel_jobs,
+                max_workers=n_workers_pp,
                 initializer=init_log_queue_for_children,
                 initargs=(log_queue,),
             ) as pp_pool,
-            ThreadPoolExecutor(max_workers=parallel_jobs) as dl_pool,
+            ThreadPoolExecutor(max_workers=n_workers_dl) as dl_pool,
             LogQueueConsumer(log_queue),
             default_bar() as progress,
             Meta(output_dir / "meta.duckdb") as meta,

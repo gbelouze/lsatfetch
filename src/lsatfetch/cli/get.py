@@ -19,14 +19,16 @@ def get(
     download: bool = True,
     postprocess: bool = True,
     quality: int = 50,
-    parallel_jobs: int = 4,
+    n_workers_dl: int = 4,
+    n_workers_pp: int = 4,
 ) -> None:
     log.debug("Loading configuration")
     cfg = load(config_path)
     log.info(f"Configuration loaded from {config_path}")
     log.info(f"Output directory: {cfg.output_dir}")
     log.debug(f"AOI type: {cfg.aoi.type}")
-    log.debug(f"Parallel jobs: {parallel_jobs}")
+    log.debug(f"Download workers: {n_workers_dl}")
+    log.debug(f"Preprocess workers: {n_workers_pp}")
 
     log.info("Identifying tiles...")
     if cfg.aoi.type == "bbox":
@@ -80,7 +82,8 @@ def get(
         start_date=start_date,
         end_date=end_date,
         output_dir=cfg.output_dir,
-        parallel_jobs=parallel_jobs,
+        n_workers_dl=n_workers_dl,
+        n_workers_pp=n_workers_pp,
         download=download,
         postprocess=postprocess,
         quality=quality,

@@ -17,7 +17,7 @@ class SessionStats:
         output_dir: Path,
         meta: Meta,
         postprocess_enabled: bool,
-        update_interval: float = 0.5,
+        update_interval: float = 10.,
     ):
         self.task_ids = [f"{t.lon_name}_{t.lat_name}:{p.n}" for t, p in tasks]
         self.postprocess_enabled = postprocess_enabled
