@@ -19,10 +19,11 @@ from rich.progress import Progress
 from shapely.geometry import MultiPolygon, Polygon
 
 from lsatfetch.const import (
+    BAND_7_RANGE,
+    BAND_123_RANGE,
+    BAND_456_RANGE,
     GLAD_LANDSAT_BUCKET,
     KEEP_VALUES,
-    MAX_PIXEL,
-    MIN_PIXEL,
 )
 from lsatfetch.tile import (
     Period,
@@ -185,15 +186,27 @@ def compress_landsat_image(input_path: Path, output_path: Path, quality: int = 5
         band8 = src.read(8)
         profile = src.profile
 
-        valid_mask = np.isin(band8, list(KEEP_VALUES))
-        masked_data = bands_data.copy()
-        masked_data[:, ~valid_mask] = 0
-
         nbands = bands_data.shape[0]
+        valid_mask = np.isin(band8, list(KEEP_VALUES))
+        bands_data[:, ~valid_mask] = 0
 
-        arr = np.clip(masked_data, MIN_PIXEL, MAX_PIXEL)
-        arr = 255 * (arr - MIN_PIXEL) / (MAX_PIXEL - MIN_PIXEL)
-        arr = arr.astype("uint8")
+        # Normalize band groups independently
+        # Band 1, 2, 3: 0 to 8000
+        low, high = BAND_123_RANGE
+        bands_data[0:3] = np.clip(bands_data[0:3], low, high)
+        bands_data[0:3] = 255 * (bands_data[0:3] - low) / (high - low)
+
+        # Band 4, 5, 6: 0 to 20000
+        low, high = BAND_456_RANGE
+        bands_data[3:6] = np.clip(bands_data[3:6], low, high)
+        bands_data[3:6] = 255 * (bands_data[3:6] - low) / (high - low)
+
+        # Band 7: 28000 to 30000
+        low, high = BAND_7_RANGE
+        bands_data[6] = np.clip(bands_data[6], low, high)
+        bands_data[6] = 255 * (bands_data[6] - low) / (high - low)
+
+        arr = bands_data.astype("uint8")
 
         profile.update(
             driver="JP2OpenJPEG",
