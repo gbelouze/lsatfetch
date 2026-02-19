@@ -29,15 +29,11 @@ class LSATStatsColumn(ProgressColumn):
         if not stats:
             return Text("")
 
-        dl_f = stats.get("dl_filter_rate", 0) * 100
-        pp_f = stats.get("pp_filter_rate", 0) * 100
-
-        tif_avg = (stats.get("avg_tif_size") or 0) / 1_000_000
-        jp2_avg = (stats.get("avg_jp2_size") or 0) / 1_000_000
+        f_rate = stats.get("filter_rate", 0) * 100
+        avg = stats.get("avg_size", 0) / 1_000_000
 
         return Text(
-            f"F: {dl_f:>.0f}%(dl) / {pp_f:>.0f}%(pp) | "
-            f"Avg: {tif_avg:.0f}(tif) /{jp2_avg:.0f}(jp2) MB",
+            f"Filtered: {f_rate:>.0f}% | Avg. size: {avg:.0f} MB",
             style="dim yellow",
         )
 

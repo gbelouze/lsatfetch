@@ -22,6 +22,7 @@ class DownloadResult(TypedDict):
     downloaded_at: datetime
     size_bytes: int | None
     is_missing: bool
+    file_exists: bool
 
 
 class ProcessResult(TypedDict):
@@ -34,6 +35,7 @@ class ProcessResult(TypedDict):
     n_valid_final: int
     discarded: bool
     compressed_size_bytes: int | None
+    file_exists: bool
 
 
 class TableManager[T: MutableMapping](MutableMapping[str, T]):
@@ -96,6 +98,7 @@ class Meta:
             "downloaded_at": "TIMESTAMP",
             "size_bytes": "BIGINT",
             "is_missing": "BOOLEAN",
+            "file_exists": "BOOLEAN DEFAULT TRUE",
         }
         self._pp_schema = {
             "id": "TEXT PRIMARY KEY",
@@ -105,12 +108,14 @@ class Meta:
             "n_valid_final": "INTEGER",
             "discarded": "BOOLEAN",
             "compressed_size_bytes": "BIGINT",
+            "file_exists": "BOOLEAN DEFAULT TRUE",
         }
 
-        # Initialize tables
+        # Initialize tables and migrate if necessary
         with self:
             self._create_table("downloads", self._dl_schema)
             self._create_table("postprocessing", self._pp_schema)
+            self._migrate_exists_column()
 
         self.dl: TableManager[dict[str, Any]] = TableManager(self, "downloads", self._dl_schema)
         self.pp: TableManager[dict[str, Any]] = TableManager(
@@ -149,6 +154,35 @@ class Meta:
         if self._con:
             self._con.close()
             self._con = None
+
+    def _migrate_exists_column(self) -> None:
+        """Add file_exists column to existing tables if missing."""
+        for table in ["downloads", "postprocessing"]:
+            # Check if column exists
+            cols = self.con.execute(f"PRAGMA table_info({table})").fetchall()
+            if not any(c[1] == "file_exists" for c in cols):
+                log.info(f"Migrating {table}: adding file_exists column")
+                self.con.execute(f"ALTER TABLE {table} ADD COLUMN file_exists BOOLEAN DEFAULT TRUE")
+
+    def reconcile_existence(self, task_ids: list[str]) -> None:
+        """Check filesystem for current tasks and update file_exists column."""
+        # Query paths for these tasks
+        self.con.execute("CREATE TEMPORARY TABLE IF NOT EXISTS rec_tasks (id TEXT PRIMARY KEY)")
+        self.con.execute("DELETE FROM rec_tasks")
+        self.con.executemany("INSERT INTO rec_tasks VALUES (?)", [[tid] for tid in task_ids])
+
+        for table in ["downloads", "postprocessing"]:
+            rows = self.con.execute(
+                f"SELECT id, path FROM {table} WHERE id IN (SELECT id FROM rec_tasks)"
+            ).fetchall()
+
+            updates = []
+            for tid, path_str in rows:
+                exists = Path(path_str).exists()
+                updates.append([exists, tid])
+
+            if updates:
+                self.con.executemany(f"UPDATE {table} SET file_exists = ? WHERE id = ?", updates)
 
     def get_stats(self) -> dict[str, Any]:
         """
@@ -190,6 +224,73 @@ class Meta:
             "avg_jp2_size": pp_row[0] if pp_row else None,
             "pp_filter_rate": pp_row[1] if pp_row else 0.0,
             "total_jp2_bytes": pp_row[2] if pp_row else 0,
+        }
+
+    def get_session_summary(self, task_ids: list[str], postprocess: bool) -> dict[str, Any]:
+        """
+        Get completion stats for a specific set of task IDs.
+
+        Parameters
+        ----------
+        task_ids : list[str]
+            List of tile_id strings.
+        postprocess : bool
+            Whether post-processing is enabled.
+
+        Returns
+        -------
+        dict
+            Summary stats for the given tasks.
+        """
+        if not task_ids:
+            return {
+                "completed_bytes": 0,
+                "n_done": 0,
+                "dl_missing": 0,
+                "pp_discarded": 0,
+                "dl_total": 0,
+                "pp_total": 0,
+            }
+
+        # Use a temporary table for efficient joining
+        self.con.execute("CREATE TEMPORARY TABLE IF NOT EXISTS current_tasks (id TEXT PRIMARY KEY)")
+        self.con.execute("DELETE FROM current_tasks")
+        self.con.executemany("INSERT INTO current_tasks VALUES (?)", [[tid] for tid in task_ids])
+
+        done_filter = (
+            "d.is_missing OR p.discarded OR p.compressed_size_bytes IS NOT NULL"
+            if postprocess
+            else "d.is_missing OR d.size_bytes IS NOT NULL"
+        )
+
+        query = f"""
+            SELECT
+                SUM(d.size_bytes) FILTER (WHERE d.file_exists) as dl_bytes,
+                SUM(p.compressed_size_bytes) FILTER (WHERE p.file_exists) as pp_bytes,
+                COUNT(d.id) as dl_total,
+                COUNT(*) FILTER (WHERE d.is_missing) as dl_missing,
+                COUNT(p.id) as pp_total,
+                COUNT(*) FILTER (WHERE p.discarded) as pp_discarded,
+                -- Count how many tasks have reached a 'final' state for the current mode
+                COUNT(*) FILTER (
+                    WHERE {done_filter}
+                ) as n_done_final
+            FROM current_tasks ct
+            LEFT JOIN downloads d ON ct.id = d.id
+            LEFT JOIN postprocessing p ON ct.id = p.id
+        """
+        row = self.con.execute(query).fetchone()
+        if not row:
+            return {}
+
+        return {
+            "dl_bytes": row[0] or 0,
+            "pp_bytes": row[1] or 0,
+            "dl_total": row[2] or 0,
+            "dl_missing": row[3] or 0,
+            "pp_total": row[4] or 0,
+            "pp_discarded": row[5] or 0,
+            "n_done_final": row[6] or 0,
         }
 
 

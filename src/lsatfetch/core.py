@@ -113,6 +113,7 @@ def download_tile(
                 downloaded_at=datetime.now(),
                 size_bytes=None,
                 is_missing=True,
+                file_exists=False,
             )
         log.warning(f"Error checking S3 object {GLAD_LANDSAT_BUCKET}/{s3_key}: {e}")
         return None
@@ -151,6 +152,7 @@ def download_tile(
                 downloaded_at=datetime.now(),
                 size_bytes=file_size,
                 is_missing=False,
+                file_exists=True,
             )
     except Exception as e:
         log.error(f"Failed to download {s3_key}: {e}")
@@ -267,6 +269,7 @@ def process_file(
             n_valid_final=pixel_stat["n_valid_final"],
             discarded=True,
             compressed_size_bytes=None,
+            file_exists=False,
         )
 
     output_path = input_path.with_suffix(".jp2")
@@ -280,6 +283,7 @@ def process_file(
         n_valid_final=pixel_stat["n_valid_final"],
         discarded=False,
         compressed_size_bytes=output_path.stat().st_size,
+        file_exists=True,
     )
 
 
@@ -365,12 +369,13 @@ async def _get_async(
             default_bar() as progress,
             Meta(output_dir / "meta.duckdb") as meta,
         ):
-            stats = SessionStats(tasks, output_dir, meta, download, postprocess)
+            stats = SessionStats(tasks, output_dir, meta, postprocess)
+            meta.reconcile_existence(stats.task_ids)
 
             pp_bar = progress.add_task(
                 "[cyan]Processing downloaded tiles...[/]",
                 total=1,
-                **stats.get_progress_fields(),
+                **stats.get_progress_fields("pp"),
             )
             if not postprocess:
                 progress.update(pp_bar, visible=False)
@@ -378,7 +383,7 @@ async def _get_async(
             dl_bar = progress.add_task(
                 "[cyan]Downloading Landsat ARD tiles...[/]",
                 total=len(tasks),
-                **stats.get_progress_fields(),
+                **stats.get_progress_fields("dl"),
             )
             if not download:
                 progress.update(dl_bar, visible=False)
@@ -388,6 +393,10 @@ async def _get_async(
             dl_futures: dict[asyncio.Future[DownloadResult | None], tuple[Tile, Period, str]] = {}
 
             n_failures = 0
+            n_downloaded = 0
+            n_processed = 0
+            n_dl_skipped = 0
+            n_pp_skipped = 0
             first_failure = None
 
             # sort for spatial exhaustivity first, temporal second
@@ -400,17 +409,13 @@ async def _get_async(
 
                 # Check if we should skip download
                 skip_dl = not download
-                is_missing = False
-                is_discarded = False
                 if not skip_dl:
                     if tile_id in meta.dl and meta.dl[tile_id]["is_missing"]:
                         log.debug(f"Skipping {tile_id}: established as missing on S3.")
                         skip_dl = True
-                        is_missing = True
                     elif tile_id in meta.pp and meta.pp[tile_id]["discarded"]:
                         log.debug(f"Skipping {tile_id}: established as too cloudy.")
                         skip_dl = True
-                        is_discarded = True
                     elif jp2_path.exists():
                         log.debug(f"Skipping {tile_id}: JP2 already exists.")
                         skip_dl = True
@@ -419,12 +424,18 @@ async def _get_async(
                         skip_dl = True
 
                 if skip_dl:
+                    n_dl_skipped += 1
+
                     # If tif exists but not processed, we still want to process it
-                    will_process = False
                     if postprocess and tif_path.exists() and not jp2_path.exists():
                         if tile_id in meta.pp and meta.pp[tile_id]["discarded"]:
                             log.debug(f"{tif_path} exists but is marked as filtered out. Removing.")
                             tif_path.unlink()
+                            # Mark as not existing in downloads
+                            if tile_id in meta.dl:
+                                d = meta.dl[tile_id]
+                                d["file_exists"] = False
+                                meta.dl[tile_id] = d
                         else:
                             pp_future = loop.run_in_executor(
                                 pp_pool,
@@ -436,17 +447,9 @@ async def _get_async(
                             pp_futures[pp_future] = tile_id
                             n_pp_submitted += 1
                             progress.update(pp_bar, total=n_pp_submitted)
-                            will_process = True
-
-                    stats.dl_skipped(
-                        tile_id,
-                        is_missing=is_missing,
-                        is_discarded=is_discarded,
-                        will_process=will_process,
-                    )
 
                     progress.advance(dl_bar)
-                    stats.update_ui(progress, dl_bar, pp_bar)
+                    stats.update_ui(meta, progress, dl_bar, pp_bar)
                     continue
 
                 # Submit download task
@@ -467,20 +470,25 @@ async def _get_async(
                             try:
                                 dl_res: DownloadResult | None = task.result()
                                 if dl_res is not None:
+                                    # New downloads always exist on disk
+                                    dl_res["file_exists"] = True
                                     meta.dl[tile_id] = cast(dict[str, Any], dl_res)
-                                    stats.dl_done(dl_res)
-                                    if not dl_res["is_missing"] and postprocess:
-                                        tif_path = Path(dl_res["path"])
-                                        pp_future = loop.run_in_executor(
-                                            pp_pool,
-                                            process_file,
-                                            tif_path,
-                                            tile_id,
-                                            quality,
-                                        )
-                                        pp_futures[pp_future] = tile_id
-                                        n_pp_submitted += 1
-                                        progress.update(pp_bar, total=n_pp_submitted)
+                                    if dl_res["is_missing"]:
+                                        n_dl_skipped += 1
+                                    else:
+                                        n_downloaded += 1
+                                        if postprocess:
+                                            tif_path = Path(dl_res["path"])
+                                            pp_future = loop.run_in_executor(
+                                                pp_pool,
+                                                process_file,
+                                                tif_path,
+                                                tile_id,
+                                                quality,
+                                            )
+                                            pp_futures[pp_future] = tile_id
+                                            n_pp_submitted += 1
+                                            progress.update(pp_bar, total=n_pp_submitted)
                                 else:
                                     n_failures += 1
                             except Exception as e:
@@ -490,22 +498,33 @@ async def _get_async(
                             finally:
                                 if dl_bar is not None:
                                     progress.advance(dl_bar)
-                                stats.update_ui(progress, dl_bar, pp_bar)
+                                stats.update_ui(meta, progress, dl_bar, pp_bar)
 
                         elif task in pp_futures:
                             task = cast(asyncio.Future[ProcessResult], task)
                             tile_id = pp_futures.pop(task)
                             try:
                                 pp_res: ProcessResult = task.result()
+                                pp_res["file_exists"] = not pp_res["discarded"]
                                 meta.pp[tile_id] = cast(dict[str, Any], pp_res)
-                                stats.pp_done(pp_res)
+
+                                # When a JP2 is created or a TIF is discarded, the TIF is deleted.
+                                # Update downloads table to reflect disk usage.
+                                if tile_id in meta.dl:
+                                    d = meta.dl[tile_id]
+                                    d["file_exists"] = False
+                                    meta.dl[tile_id] = d
+                                if pp_res["discarded"]:
+                                    n_pp_skipped += 1
+                                else:
+                                    n_processed += 1
                             except Exception as e:
                                 log.error(f"Error processing {tile_id}: {e}")
                                 n_failures += 1
                                 first_failure = first_failure if first_failure is not None else e
                             finally:
                                 progress.advance(pp_bar)
-                                stats.update_ui(progress, dl_bar, pp_bar)
+                                stats.update_ui(meta, progress, dl_bar, pp_bar)
             except (KeyboardInterrupt, asyncio.CancelledError):
                 log.warning("[yellow]Interrupt received. Please wait for cleanup...[/]")
                 for fut in dl_futures:
@@ -514,6 +533,9 @@ async def _get_async(
                 pp_pool.shutdown(wait=False, cancel_futures=True)
                 raise
 
+            # Final forced UI update
+            stats.update_ui(meta, progress, dl_bar, pp_bar, force=True)
+
             if n_failures > 0:
                 raise DownloadError(
                     f"{n_failures} failure(s) during download/processing."
@@ -521,15 +543,12 @@ async def _get_async(
 
             if download:
                 log.info(
-                    f"[green]Finished[/]: downloaded {stats.n_downloaded} tiles, "
-                    f"skipped {stats.n_dl_skipped}"
+                    f"[green]Finished[/]: downloaded {n_downloaded} tiles, skipped {n_dl_skipped}"
                 )
             else:
                 log.info("[green]Finished[/]: skipped download stage")
 
             if postprocess:
-                log.info(
-                    f"Processed {stats.n_processed} tiles. Discarded {stats.n_pp_skipped} tiles."
-                )
+                log.info(f"Processed {n_processed} tiles. Discarded {n_pp_skipped} tiles.")
 
-    return stats.n_downloaded, stats.n_processed
+    return n_downloaded, n_processed
