@@ -90,14 +90,15 @@ def download_tile(
     DownloadResult | None
         Results of the download, or None if download failed (but not 404).
     """
+    tile_id = f"{tile.lon_name}_{tile.lat_name}:{period.n}"
+    log.debug(f"Downloading tile {tile_id}")
+
     s3_key = tile_s3_key(tile, period)
     output_dir = Path(output_dir).expanduser().absolute()
     output_dir.mkdir(parents=True, exist_ok=True)
 
     output_path = output_dir / f"{tile.lat_name}_{tile.lon_name}" / f"{period.n}.tif"
     output_path.parent.mkdir(exist_ok=True)
-
-    tile_id = f"{tile.lon_name}_{tile.lat_name}:{period.n}"
 
     s3 = _get_s3_client()
 
@@ -256,6 +257,7 @@ def process_file(
     quality : int
         JPEG2000 compression quality. Defaults to 50.
     """
+    log.debug(f"Processing tile {tile_id}")
     pixel_stat = compute_pixel_statistics(input_path)
 
     if pixel_stat["discarded"]:
@@ -340,7 +342,9 @@ def get(
 
     output_dir = Path(output_dir).expanduser().absolute()
     output_dir.mkdir(parents=True, exist_ok=True)
-    return asyncio.run(_get_async(tasks, output_dir, parallel_jobs, download, postprocess, quality))
+    return asyncio.run(
+        _get_async(tasks, output_dir, n_workers_dl, n_workers_pp, download, postprocess, quality)
+    )
 
 
 async def _get_async(
