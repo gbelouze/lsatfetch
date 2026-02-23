@@ -43,9 +43,11 @@ def init(
 def get(
     config: Path,
     verbose: bool = False,
+    download: bool = True,
     postprocess: bool = False,
     quality: int = 50,
-    parallel_jobs: int = 4,
+    n_workers_dl: int = 4,
+    n_workers_pp: int = 4,
 ) -> None:
     """
     Create a Landsat dataset based on the provided configuration.
@@ -56,17 +58,22 @@ def get(
         Path to the configuration YAML file.
     verbose : bool
         Enable verbose (DEBUG) logging. Defaults to False.
+    download : bool
+        Enable downloading of tiles. If False, only already downloaded tiles are processed.
+        Defaults to True.
     postprocess : bool
         Enable post-processing (compression to JP2). Defaults to False.
     quality : int
         JPEG2000 compression quality (1-100). Defaults to 50.
-    parallel_jobs : int
+    n_workers_dl : int
         Number of parallel download jobs. Defaults to 4.
+    n_workers_pp : int
+        Number of parallel preprocessing jobs. Defaults to 4.
     """
     _setup_logging(level=logging.DEBUG if verbose else logging.INFO)
     from lsatfetch.cli.get import get as get_cmd
 
-    get_cmd(config, postprocess, quality, parallel_jobs)
+    get_cmd(config, download, postprocess, quality, n_workers_dl, n_workers_pp)
 
 
 @app.command

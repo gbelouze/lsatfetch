@@ -8,15 +8,64 @@ from rich.progress import (
     BarColumn,
     MofNCompleteColumn,
     Progress,
+    ProgressColumn,
+    Task,
     TaskID,
     TextColumn,
-    TimeElapsedColumn,
 )
+from rich.text import Text
 
 __all__ = ["default_bar", "lsat_debug"]
 
 
 log = logging.getLogger(__name__)
+
+
+class LSATStatsColumn(ProgressColumn):
+    """Shows filter rates and averages for TIF and JP2 files."""
+
+    def render(self, task: Task) -> Text:
+        stats = task.fields.get("stats", {})
+        if not stats:
+            return Text("")
+
+        f_rate = stats.get("filter_rate", 0) * 100
+        avg = stats.get("avg_size", 0) / 1_000_000
+
+        return Text(
+            f"Filtered: {f_rate:>.0f}% | Avg. size: {avg:.0f} MB",
+            style="dim yellow",
+        )
+
+
+class LSATPredictiveBytesColumn(ProgressColumn):
+    """Shows [Completed Bytes] / [Estimated Total Bytes]."""
+
+    def render(self, task: Task) -> Text:
+        completed = (task.fields.get("completed_bytes") or 0) / 1_000_000_000
+        total = (task.fields.get("total_predicted_bytes") or 0) / 1_000_000_000
+        return Text(f"{completed:.1f}/{total:.1f} GB", style="cyan")
+
+
+class LSATTimeColumn(ProgressColumn):
+    """Shows [Elapsed] < [Remaining] for the whole session."""
+
+    def render(self, task: Task) -> Text:
+        elapsed = task.elapsed
+        remaining = task.time_remaining
+        if elapsed is None:
+            return Text("- < -", style="dim")
+
+        e_str = self._format_time(elapsed)
+        r_str = self._format_time(remaining) if remaining is not None else "-"
+        return Text(f"{e_str} < {r_str}", style="dim cyan")
+
+    def _format_time(self, seconds: float) -> str:
+        minutes, seconds = divmod(int(seconds), 60)
+        hours, minutes = divmod(minutes, 60)
+        if hours:
+            return f"{hours:d}:{minutes:02d}:{seconds:02d}"
+        return f"{minutes:02d}:{seconds:02d}"
 
 
 def lsat_debug() -> bool:
@@ -37,7 +86,9 @@ def default_bar() -> Progress:
         TextColumn("[progress.description]{task.description}"),
         BarColumn(),
         MofNCompleteColumn(),
-        TimeElapsedColumn(),
+        LSATPredictiveBytesColumn(),
+        LSATStatsColumn(),
+        LSATTimeColumn(),
         refresh_per_second=1,
         disable=disabled,
     )
@@ -79,12 +130,14 @@ def temporary_task(progress: Progress, *args: Any, **kwargs: Any) -> Iterator[Ta
     ...         for i in range(100):
     ...             progress.update(task, advance=1)
     """
+    task = None
     try:
         task = progress.add_task(*args, **kwargs)
         yield task
     finally:
-        progress.update(task, visible=False)
-        progress.remove_task(task)
+        if task is not None:
+            progress.update(task, visible=False)
+            progress.remove_task(task)
 
 
 if __name__ == "__main__":

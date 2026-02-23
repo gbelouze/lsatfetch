@@ -34,8 +34,9 @@ repos:
     hooks:
       - id: ty
         name: ty check
-        entry: uvx ty check .
+        entry: uv run --active ty check
         language: python
+        files: '.*\.py'
   - repo: https://github.com/jsh9/pydoclint
     rev: 0.6.2
     hooks:

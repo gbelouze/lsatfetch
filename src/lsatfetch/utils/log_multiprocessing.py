@@ -40,11 +40,10 @@ from multiprocessing.queues import Queue
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    LogQueue = Queue[logging.LogRecord]  # pid, record
+    LogQueue = Queue[logging.LogRecord]  
 else:
     LogQueue = Queue
 
-# Global queue (set by init in child processes)
 log_queue: LogQueue | None = None
 
 
@@ -55,10 +54,8 @@ class PicklableQueueHandler(QueueHandler):
     """
 
     def prepare(self, record: logging.LogRecord) -> logging.LogRecord:
-        # 1. Standard preparation (handles some internal logging metadata)
         record = super().prepare(record)
 
-        # 2. Handle exceptions (Your original logic)
         if record.exc_info:
             # This turns the traceback object into a string and
             # stores it in record.exc_text
